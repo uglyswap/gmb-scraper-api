@@ -8,15 +8,12 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install Node.js dependencies
-RUN npm ci --only=production
+# Install Node.js dependencies (including dev for tsx)
+RUN npm install
 
 # Copy source code
 COPY tsconfig.json ./
 COPY src ./src
-
-# Build TypeScript
-RUN npm run build || true
 
 # Production image with Python + Playwright
 FROM mcr.microsoft.com/playwright:v1.40.0-jammy
@@ -30,14 +27,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy Node.js dependencies and built files
+# Copy Node.js dependencies and source files
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist 2>/dev/null || true
 COPY --from=builder /app/package*.json ./
-
-# Copy source files (for tsx runtime if dist doesn't exist)
-COPY src ./src
-COPY tsconfig.json ./
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./
 
 # Copy Python scraper
 COPY scraper ./scraper
@@ -59,5 +53,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-# Start the API
+# Start the API with tsx (TypeScript runtime)
 CMD ["npx", "tsx", "src/index.ts"]
