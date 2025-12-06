@@ -18,9 +18,10 @@ COPY src ./src
 # Production image with Python + Playwright
 FROM mcr.microsoft.com/playwright:v1.40.0-jammy
 
-# Install Node.js
+# Install Node.js and python3-pip
 RUN apt-get update && apt-get install -y \
     curl \
+    python3-pip \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -37,7 +38,7 @@ COPY --from=builder /app/tsconfig.json ./
 COPY scraper ./scraper
 
 # Install Python dependencies
-RUN pip install playwright && \
+RUN pip3 install playwright && \
     playwright install chromium && \
     playwright install-deps chromium
 
