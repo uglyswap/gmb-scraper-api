@@ -349,7 +349,9 @@ class GMBScraperProduction:
                         if r.status == 200:
                             html = await r.text()
                             emails = re.findall(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', html)
-                            valid = [e for e in emails if not any(x in e.lower() for x in ['example', 'test', 'google', 'sentry', 'wix', 'wordpress', 'jquery', 'script'])]
+                            # Filter out invalid emails (spam, images, etc.)
+                            invalid_patterns = ['example', 'test', 'google', 'sentry', 'wix', 'wordpress', 'jquery', 'script', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.css', '.js']
+                            valid = [e for e in emails if not any(x in e.lower() for x in invalid_patterns)]
                             if valid and pid in self.data.businesses:
                                 self.data.businesses[pid]['email'] = valid[0]
                                 found += 1

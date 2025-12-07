@@ -454,10 +454,10 @@
         <div class="form-group">
           <label>Zones</label>
           <select id="gridSize">
-            <option value="2">Minimal (9)</option>
-            <option value="3" selected>Standard (16)</option>
-            <option value="4">Complet (20)</option>
-            <option value="5">Maximum (20)</option>
+            <option value="3">Rapide (9 zones)</option>
+            <option value="4" selected>Standard (16 zones)</option>
+            <option value="6">Complet (36 zones)</option>
+            <option value="10">Maximum (100 zones)</option>
           </select>
         </div>
         <div class="form-group">
@@ -468,7 +468,7 @@
 
     <div id="progressCard" class="progress-card">
       <div class="progress-header">
-        <h3><div class="spinner"></div> Scraping en cours...</h3>
+        <h3 id="progressTitle"><div id="progressSpinner" class="spinner"></div> <span id="progressStatus">Scraping en cours...</span></h3>
         <button class="btn btn-danger" onclick="stopScraping()">Arreter</button>
       </div>
 
@@ -597,6 +597,8 @@
       stats = { total: 0, with_phone: 0, with_email: 0, with_website: 0, with_address: 0 };
       document.getElementById('resultsBody').innerHTML = '';
       document.getElementById('logContainer').innerHTML = '';
+      document.getElementById('progressStatus').textContent = 'Scraping en cours...';
+      document.getElementById('progressSpinner').style.display = 'inline-block';
       document.getElementById('progressBar').style.width = '0%';
       updateStat('statTotal', 0, false);
       updateStat('statPhone', 0, false);
@@ -835,6 +837,10 @@
       document.getElementById('progressBar').style.width = '100%';
       document.getElementById('resultsCount').textContent = businesses.length;
       document.getElementById('progressText').textContent = 'Termine!';
+
+      // Update header status
+      document.getElementById('progressStatus').textContent = 'Termine!';
+      document.getElementById('progressSpinner').style.display = 'none';
 
       setPhase(5); // All done
 
