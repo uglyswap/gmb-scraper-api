@@ -7,7 +7,7 @@ import { z } from 'zod';
 export const ScrapeQuerySchema = z.object({
   activity: z.string().min(2, 'Activité requise (min 2 caractères)'),
   city: z.string().min(2, 'Ville requise (min 2 caractères)'),
-  grid_size: z.coerce.number().int().min(1).max(10).default(4),
+  grid_size: z.coerce.number().int().min(1).max(32).default(4),
 });
 
 export const BusinessSchema = z.object({
