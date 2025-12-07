@@ -37,6 +37,9 @@ COPY --from=builder /app/tsconfig.json ./
 # Copy Python scraper
 COPY scraper ./scraper
 
+# Copy public folder for web frontend
+COPY public ./public
+
 # Install Python dependencies
 RUN pip3 install playwright && \
     playwright install chromium && \
