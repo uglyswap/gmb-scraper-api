@@ -54,6 +54,7 @@ app.get('/', (c) => {
       'GET /health': 'Vérification de l\'état de l\'API',
       'GET /api/scrape/stream?activity=...&city=...': 'Scraping avec streaming SSE (temps réel)',
       'POST /api/scrape': 'Scraping synchrone (attend la fin)',
+      'POST /api/scrape/webhook': '⭐ Mode webhook pour n8n (async + callback)',
       'GET /api/scrape/:jobId': 'Récupérer les résultats d\'un job',
       'GET /api/scrape/info/cities': 'Liste des villes supportées',
       'POST /api/generate-key': 'Générer une nouvelle clé API (dev only)'
@@ -71,6 +72,17 @@ app.get('/', (c) => {
         method: 'POST',
         url: '/api/scrape',
         body: { activity: 'agence immobiliere', city: 'lyon', grid_size: 4 }
+      },
+      webhook_n8n: {
+        method: 'POST',
+        url: '/api/scrape/webhook',
+        body: {
+          activity: 'restaurant',
+          city: 'paris',
+          grid_size: 3,
+          webhook_url: 'https://votre-n8n.com/webhook/xxx'
+        },
+        note: 'Retour immédiat + callback webhook quand terminé'
       }
     },
     supported_cities: SUPPORTED_CITIES.slice(0, 10).concat(['...'] as any),
@@ -138,6 +150,7 @@ console.log(`
 ║  • GET  /health                    Health check                  ║
 ║  • GET  /api/scrape/stream         Streaming SSE                 ║
 ║  • POST /api/scrape                Scraping synchrone            ║
+║  • POST /api/scrape/webhook        Mode webhook (n8n)            ║
 ║  • GET  /api/scrape/:jobId         Récupérer un job              ║
 ║  • GET  /api/scrape/info/cities    Villes supportées             ║
 ╠══════════════════════════════════════════════════════════════════╣

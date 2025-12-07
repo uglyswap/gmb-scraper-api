@@ -4,8 +4,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { ScraperService } from '../services/scraper.js';
 import { ScrapeQuerySchema, SUPPORTED_CITIES } from '../types/index.js';
 import type { ScrapeResult, Business, SSEEvent } from '../types/index.js';
+import { z } from 'zod';
 
 const scrapeRouter = new Hono();
+
+// Schema pour l'endpoint webhook
+const WebhookScrapeSchema = z.object({
+  activity: z.string().min(2, 'Activité requise (min 2 caractères)'),
+  city: z.string().min(2, 'Ville requise (min 2 caractères)'),
+  grid_size: z.coerce.number().int().min(1).max(6).default(4),
+  webhook_url: z.string().url('URL webhook invalide'),
+});
 
 // Store des jobs en cours et terminés
 const jobStore = new Map<string, {
@@ -174,9 +183,14 @@ scrapeRouter.post('/', async (c) => {
       completedAt: new Date()
     });
 
+    // Structure aplatie pour compatibilité n8n (champs directement accessibles)
     return c.json({
       success: true,
-      data: scrapeResult,
+      job_id: scrapeResult.job_id,
+      query: scrapeResult.query,
+      stats: scrapeResult.stats,
+      businesses: scrapeResult.businesses,
+      total_businesses: scrapeResult.businesses.length,
       timestamp: new Date().toISOString()
     });
 
@@ -195,6 +209,121 @@ scrapeRouter.post('/', async (c) => {
       timestamp: new Date().toISOString()
     }, 500);
   }
+});
+
+// ============================================================================
+// POST /scrape/webhook - Mode asynchrone avec callback webhook (idéal pour n8n)
+// ============================================================================
+
+scrapeRouter.post('/webhook', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+
+  const validation = WebhookScrapeSchema.safeParse(body);
+
+  if (!validation.success) {
+    return c.json({
+      success: false,
+      error: 'Paramètres invalides',
+      details: validation.error.flatten(),
+      usage: {
+        activity: 'Type de business (ex: "restaurant", "coiffeur")',
+        city: `Ville (${SUPPORTED_CITIES.slice(0, 5).join(', ')}...)`,
+        grid_size: 'Taille de la grille 1-6 (défaut: 4)',
+        webhook_url: 'URL du webhook n8n à appeler quand terminé'
+      },
+      timestamp: new Date().toISOString()
+    }, 400);
+  }
+
+  const { activity, city, grid_size, webhook_url } = validation.data;
+  const jobId = uuidv4();
+
+  // Initialiser le job
+  jobStore.set(jobId, {
+    status: 'running',
+    startedAt: new Date()
+  });
+
+  // Lancer le scraping en arrière-plan (ne pas attendre)
+  (async () => {
+    const scraper = new ScraperService();
+
+    try {
+      const result = await scraper.scrape({
+        activity,
+        city,
+        gridSize: grid_size
+      });
+
+      const scrapeResult: ScrapeResult = {
+        job_id: jobId,
+        query: { activity, city, grid_size },
+        stats: result.stats!,
+        businesses: result.businesses
+      };
+
+      jobStore.set(jobId, {
+        status: 'completed',
+        result: scrapeResult,
+        startedAt: jobStore.get(jobId)!.startedAt,
+        completedAt: new Date()
+      });
+
+      // Appeler le webhook n8n avec les résultats (structure plate)
+      await fetch(webhook_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          job_id: jobId,
+          activity,
+          city,
+          grid_size,
+          stats: scrapeResult.stats,
+          businesses: scrapeResult.businesses,
+          total_businesses: scrapeResult.businesses.length,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+
+      jobStore.set(jobId, {
+        status: 'error',
+        error: errorMsg,
+        startedAt: jobStore.get(jobId)!.startedAt,
+        completedAt: new Date()
+      });
+
+      // Notifier l'erreur au webhook
+      try {
+        await fetch(webhook_url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: false,
+            job_id: jobId,
+            activity,
+            city,
+            error: errorMsg,
+            timestamp: new Date().toISOString()
+          })
+        });
+      } catch {
+        console.error(`Impossible d'appeler le webhook: ${webhook_url}`);
+      }
+    }
+  })();
+
+  // Réponse immédiate
+  return c.json({
+    success: true,
+    job_id: jobId,
+    message: 'Scraping lancé en arrière-plan. Les résultats seront envoyés au webhook.',
+    webhook_url,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // ============================================================================
