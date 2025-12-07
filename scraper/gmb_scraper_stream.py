@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 GMB Scraper v13 - Version API avec streaming NDJSON
 Utilise l'interception de l'API interne Google Maps pour extraction complete
@@ -10,6 +11,12 @@ import json
 import re
 import math
 import sys
+import io
+
+# Force UTF-8 output pour eviter les problemes d'encodage
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from dataclasses import dataclass, asdict
 from typing import Optional, List, Dict, Tuple
 from datetime import datetime
