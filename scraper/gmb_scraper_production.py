@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-GMB Scraper PRODUCTION v3.1 - Improved Reliability
-Based on V39 with fixes for Phase 2 extraction failures
+GMB Scraper PRODUCTION v3.2 - Up to 1024 zones
+Improved reliability with dynamic cell sizing
 """
 
 import asyncio
@@ -14,17 +14,17 @@ from urllib.parse import quote
 from playwright.async_api import async_playwright, Response
 import aiohttp
 
-# OPTIMIZED CONFIG - Balance between speed and reliability
+# OPTIMIZED CONFIG
 PHASE1_WORKERS = 15    # Workers for ID collection
 PHASE2_WORKERS = 40    # Reduced for better success rate
-GRID_SIZE = 10         # 10x10 = 100 zones
-CELL_SIZE = 0.009      # ~1km zones
+DEFAULT_GRID_SIZE = 10
+BASE_CELL_SIZE = 0.09  # Base cell size for grid_size=10 (~10km total coverage)
 SCROLL_COUNT = 6       # More scrolls to find more results
 SCROLL_DELAY = 0.3
-PAGE_DELAY = 1.5       # Increased delay between pages
+PAGE_DELAY = 1.5       # Delay between pages
 RETRY_ATTEMPTS = 2     # Retry failed extractions
 
-# City coordinates (can be extended)
+# City coordinates
 CITY_COORDS = {
     'paris': (48.8566, 2.3522),
     'lyon': (45.7640, 4.8357),
@@ -72,7 +72,7 @@ class GMBScraperProduction:
     def __init__(self, activity: str, city: str, grid_size: int = None):
         self.activity = activity
         self.city = city.lower()
-        self.grid_size = grid_size or GRID_SIZE
+        self.grid_size = grid_size or DEFAULT_GRID_SIZE
         self.data = DataStore()
         self.start_time = datetime.now()
         self.zones_done = 0
@@ -82,11 +82,16 @@ class GMBScraperProduction:
         self.failed_count = 0
         self._extract_lock = asyncio.Lock()
 
+        # Dynamic cell size based on grid_size
+        # For grid_size=10: cell_size=0.009 (~1km per cell, 10km total)
+        # For grid_size=32: cell_size=0.00281 (~300m per cell, 10km total)
+        # For grid_size=3: cell_size=0.03 (~3km per cell, 10km total)
+        self.cell_size = BASE_CELL_SIZE / self.grid_size
+
         # Get city coordinates
         if self.city in CITY_COORDS:
             self.lat, self.lng = CITY_COORDS[self.city]
         else:
-            # Default to Paris for unknown cities
             self.lat, self.lng = CITY_COORDS['paris']
 
     def extract_place_ids(self, body: str) -> List[str]:
@@ -165,11 +170,12 @@ class GMBScraperProduction:
                     "lng": lng
                 })
 
-                url = f"https://www.google.com/maps/search/{quote(f'{self.activity} {self.city}')}/@{lat},{lng},15z"
+                # Zoom level based on cell size - smaller cells need higher zoom
+                zoom = 15 if self.grid_size <= 10 else (16 if self.grid_size <= 20 else 17)
+                url = f"https://www.google.com/maps/search/{quote(f'{self.activity} {self.city}')}/@{lat},{lng},{zoom}z"
                 await page.goto(url, wait_until="domcontentloaded", timeout=20000)
                 await asyncio.sleep(PAGE_DELAY)
 
-                # More scrolls to capture more results
                 for _ in range(SCROLL_COUNT):
                     await page.evaluate('const f=document.querySelector(\'div[role="feed"]\');if(f)f.scrollTo(0,f.scrollHeight);')
                     await asyncio.sleep(SCROLL_DELAY)
@@ -198,7 +204,6 @@ class GMBScraperProduction:
             await page.goto(url, wait_until="load", timeout=20000)
             await asyncio.sleep(1.2)
 
-            # Handle consent if redirected
             current_url = page.url
             if "consent" in current_url.lower():
                 await self.accept_cookies(page)
@@ -206,7 +211,6 @@ class GMBScraperProduction:
                 await page.goto(url, wait_until="load", timeout=20000)
                 await asyncio.sleep(1.2)
 
-            # Check if we're on the right page
             title = await page.title()
             if "acceder" in title.lower() or "consent" in title.lower():
                 await self.accept_cookies(page)
@@ -214,11 +218,9 @@ class GMBScraperProduction:
                 await page.goto(url, wait_until="load", timeout=20000)
                 await asyncio.sleep(1.2)
 
-            # Extract data
             data = await page.evaluate('''() => {
                 const d = {};
 
-                // Name - try multiple selectors
                 const nameSelectors = [
                     'h1.DUwDvf',
                     'h1.fontHeadlineLarge',
@@ -242,7 +244,6 @@ class GMBScraperProduction:
                     }
                 }
 
-                // Phone
                 const phoneSelectors = [
                     'button[data-item-id*="phone"]',
                     'a[href^="tel:"]',
@@ -263,7 +264,6 @@ class GMBScraperProduction:
                     }
                 }
 
-                // Website
                 const webSelectors = [
                     'a[data-item-id="authority"]',
                     'a[data-tooltip="Ouvrir le site Web"]',
@@ -277,7 +277,6 @@ class GMBScraperProduction:
                     }
                 }
 
-                // Address
                 const addrSelectors = [
                     'button[data-item-id="address"]',
                     'button[aria-label*="Adresse"]',
@@ -295,7 +294,6 @@ class GMBScraperProduction:
                     }
                 }
 
-                // Rating
                 const ratingEl = document.querySelector('div.F7nice span[aria-hidden="true"]');
                 if (ratingEl) {
                     const ratingText = ratingEl.textContent?.replace(',', '.');
@@ -303,7 +301,6 @@ class GMBScraperProduction:
                     if (!isNaN(rating) && rating > 0 && rating <= 5) d.rating = rating;
                 }
 
-                // Reviews
                 const reviewSelectors = [
                     'div.F7nice span[aria-label*="avis"]',
                     'span[aria-label*="avis"]',
@@ -321,7 +318,6 @@ class GMBScraperProduction:
                     }
                 }
 
-                // Category
                 const catSelectors = [
                     'button[jsaction*="category"]',
                     'span.DkEaL',
@@ -352,7 +348,6 @@ class GMBScraperProduction:
                     emit("business", data)
                 success = True
             else:
-                # Retry if first attempt failed
                 if attempt < RETRY_ATTEMPTS:
                     await page.close()
                     await asyncio.sleep(0.5)
@@ -385,7 +380,6 @@ class GMBScraperProduction:
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
 
-        # Pre-accept cookies once
         init_page = await context.new_page()
         try:
             await init_page.goto("https://www.google.com/maps", timeout=20000)
@@ -398,7 +392,6 @@ class GMBScraperProduction:
 
         for pid in pids:
             await self.extract_single_pid(context, pid)
-            # Small delay between extractions to avoid rate limiting
             await asyncio.sleep(0.3)
 
         await context.close()
@@ -424,7 +417,6 @@ class GMBScraperProduction:
                         if r.status == 200:
                             html = await r.text()
                             emails = re.findall(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', html)
-                            # Filter out invalid emails (spam, images, etc.)
                             invalid_patterns = ['example', 'test', 'google', 'sentry', 'wix', 'wordpress', 'jquery', 'script', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.css', '.js']
                             valid = [e for e in emails if not any(x in e.lower() for x in invalid_patterns)]
                             if valid and pid in self.data.businesses:
@@ -464,7 +456,8 @@ class GMBScraperProduction:
             "city": self.city,
             "grid_size": self.grid_size,
             "total_zones": self.total_zones,
-            "version": "PRODUCTION v3.1 - 40 workers, improved reliability"
+            "cell_size_km": round(self.cell_size * 111, 2),
+            "version": f"PRODUCTION v3.2 - 40 workers, {self.total_zones} zones"
         })
 
         async with async_playwright() as p:
@@ -477,24 +470,25 @@ class GMBScraperProduction:
             zones = []
             zone_id = 0
             offset = self.grid_size // 2
-            cell_size = CELL_SIZE
 
             for i in range(self.grid_size):
                 for j in range(self.grid_size):
-                    lat = self.lat + (i - offset) * cell_size
-                    lng = self.lng + (j - offset) * cell_size
+                    lat = self.lat + (i - offset) * self.cell_size
+                    lng = self.lng + (j - offset) * self.cell_size
                     zones.append((lat, lng, zone_id))
                     zone_id += 1
 
             # PHASE 1 - ID Collection
-            emit("status", {"message": "Phase 1: Collecte des IDs..."})
+            emit("status", {"message": f"Phase 1: Collecte des IDs ({self.total_zones} zones)..."})
 
-            chunk_size = (len(zones) + PHASE1_WORKERS - 1) // PHASE1_WORKERS
+            # Adjust workers based on grid size
+            phase1_workers = min(PHASE1_WORKERS, max(5, self.total_zones // 10))
+            chunk_size = (len(zones) + phase1_workers - 1) // phase1_workers
             zone_chunks = [zones[i:i+chunk_size] for i in range(0, len(zones), chunk_size)]
 
             await asyncio.gather(*[
                 self.phase1_worker(browser, i, zone_chunks[i])
-                for i in range(min(PHASE1_WORKERS, len(zone_chunks)))
+                for i in range(min(phase1_workers, len(zone_chunks)))
             ])
 
             # PHASE 2 - Detail Extraction
