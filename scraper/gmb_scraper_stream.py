@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GMB Scraper v15 - Version Production
+GMB Scraper v15.1 - Version Production
 =====================================
 - Extraction SYSTEMATIQUE des details depuis chaque fiche GMB
 - Telephone, website, adresse extraits de la fiche detaillee
 - Extraction emails depuis les sites web en parallele
 - Zone de recherche precise par arrondissements/quartiers
+- Geocodage dynamique pour TOUTES les villes de France
 - Streaming NDJSON temps reel
 """
 
@@ -68,8 +69,10 @@ PARIS_ZONES = [
     (48.8421, 2.2920),  # 15eme - Convention
 ]
 
+# Grandes villes avec rayons adaptes a leur taille
 CITY_DATA = {
     "paris": {"zones": PARIS_ZONES, "radius_km": 2},
+    # Top 50 villes francaises
     "lyon": {"center": (45.7640, 4.8357), "radius_km": 5},
     "marseille": {"center": (43.2965, 5.3698), "radius_km": 6},
     "toulouse": {"center": (43.6047, 1.4442), "radius_km": 5},
@@ -96,8 +99,99 @@ CITY_DATA = {
     "limoges": {"center": (45.8336, 1.2611), "radius_km": 4},
     "metz": {"center": (49.1193, 6.1757), "radius_km": 4},
     "nancy": {"center": (48.6921, 6.1844), "radius_km": 4},
+    "perpignan": {"center": (42.6986, 2.8956), "radius_km": 4},
+    "orleans": {"center": (47.9029, 1.9039), "radius_km": 4},
+    "besancon": {"center": (47.2378, 6.0241), "radius_km": 3},
+    "saint-etienne": {"center": (45.4397, 4.3872), "radius_km": 4},
+    "caen": {"center": (49.1829, -0.3707), "radius_km": 4},
+    "mulhouse": {"center": (47.7508, 7.3359), "radius_km": 3},
+    "avignon": {"center": (43.9493, 4.8055), "radius_km": 3},
+    "poitiers": {"center": (46.5802, 0.3404), "radius_km": 3},
+    "la rochelle": {"center": (46.1603, -1.1511), "radius_km": 3},
+    "pau": {"center": (43.2951, -0.3708), "radius_km": 3},
+    "calais": {"center": (50.9513, 1.8587), "radius_km": 3},
+    "dunkerque": {"center": (51.0343, 2.3768), "radius_km": 3},
+    "troyes": {"center": (48.2973, 4.0744), "radius_km": 3},
+    "valence": {"center": (44.9334, 4.8924), "radius_km": 3},
+    "chambery": {"center": (45.5646, 5.9178), "radius_km": 3},
+    "annecy": {"center": (45.8992, 6.1294), "radius_km": 3},
+    "cannes": {"center": (43.5528, 7.0174), "radius_km": 3},
+    "antibes": {"center": (43.5808, 7.1239), "radius_km": 3},
+    "saint-malo": {"center": (48.6493, -2.0007), "radius_km": 3},
+    "lorient": {"center": (47.7500, -3.3667), "radius_km": 3},
+    "quimper": {"center": (47.9959, -4.0970), "radius_km": 3},
+    "vannes": {"center": (47.6559, -2.7603), "radius_km": 3},
+    "bayonne": {"center": (43.4929, -1.4748), "radius_km": 3},
+    "biarritz": {"center": (43.4832, -1.5586), "radius_km": 3},
+    "angouleme": {"center": (45.6500, 0.1500), "radius_km": 3},
+    "tarbes": {"center": (43.2328, 0.0781), "radius_km": 3},
+    "beziers": {"center": (43.3442, 3.2158), "radius_km": 3},
+    "colmar": {"center": (48.0794, 7.3558), "radius_km": 3},
+    "saint-nazaire": {"center": (47.2736, -2.2139), "radius_km": 3},
+    "versailles": {"center": (48.8014, 2.1301), "radius_km": 3},
+    "boulogne-billancourt": {"center": (48.8333, 2.2500), "radius_km": 3},
+    "argenteuil": {"center": (48.9472, 2.2467), "radius_km": 3},
+    "montreuil": {"center": (48.8638, 2.4483), "radius_km": 3},
+    "saint-denis": {"center": (48.9362, 2.3574), "radius_km": 3},
+    "creteil": {"center": (48.7833, 2.4667), "radius_km": 3},
+    "nanterre": {"center": (48.8925, 2.2069), "radius_km": 3},
+    "vitry-sur-seine": {"center": (48.7872, 2.3928), "radius_km": 3},
+    "asnieres-sur-seine": {"center": (48.9167, 2.2833), "radius_km": 3},
+    "courbevoie": {"center": (48.8967, 2.2567), "radius_km": 3},
+    "colombes": {"center": (48.9186, 2.2536), "radius_km": 3},
+    "aulnay-sous-bois": {"center": (48.9333, 2.4833), "radius_km": 3},
+    "rueil-malmaison": {"center": (48.8769, 2.1894), "radius_km": 3},
+    "champigny-sur-marne": {"center": (48.8175, 2.5156), "radius_km": 3},
+    "saint-maur-des-fosses": {"center": (48.7936, 2.4961), "radius_km": 3},
+    "drancy": {"center": (48.9306, 2.4500), "radius_km": 3},
+    "issy-les-moulineaux": {"center": (48.8239, 2.2700), "radius_km": 3},
+    "levallois-perret": {"center": (48.8939, 2.2875), "radius_km": 3},
+    "noisy-le-grand": {"center": (48.8486, 2.5628), "radius_km": 3},
+    "neuilly-sur-seine": {"center": (48.8847, 2.2686), "radius_km": 3},
+    "antony": {"center": (48.7536, 2.2972), "radius_km": 3},
+    "clichy": {"center": (48.9042, 2.3056), "radius_km": 3},
+    "sarcelles": {"center": (48.9958, 2.3792), "radius_km": 3},
+    "ivry-sur-seine": {"center": (48.8131, 2.3847), "radius_km": 3},
+    "villeurbanne": {"center": (45.7667, 4.8833), "radius_km": 3},
 }
 
+# Cache pour geocodage
+_GEOCODE_CACHE = {}
+
+async def geocode_city(city_name: str) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Geocode une ville francaise via Nominatim (OpenStreetMap)
+    Retourne (latitude, longitude) ou (None, None) si non trouve
+    """
+    # Verifier le cache
+    cache_key = city_name.lower().strip()
+    if cache_key in _GEOCODE_CACHE:
+        return _GEOCODE_CACHE[cache_key]
+
+    try:
+        # Ajouter "France" pour plus de precision
+        query = f"{city_name}, France"
+        url = f"https://nominatim.openstreetmap.org/search?q={quote(query)}&format=json&limit=1&countrycodes=fr"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url,
+                headers={'User-Agent': 'GMBScraperPro/1.0'},
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data and len(data) > 0:
+                        lat = float(data[0]['lat'])
+                        lon = float(data[0]['lon'])
+                        _GEOCODE_CACHE[cache_key] = (lat, lon)
+                        return (lat, lon)
+    except Exception as e:
+        emit("warning", {"message": f"Geocodage {city_name} echoue: {str(e)[:50]}"})
+
+    return (None, None)
+
+# Patterns pour filtrer les noms invalides
 INVALID_PATTERNS = [
     r'^[\d\.,\s]+$',
     r'^[a-f0-9]{20,}$',
@@ -109,6 +203,7 @@ INVALID_PATTERNS = [
     r'^\d+\.\d+$',
 ]
 
+# Blacklist pour emails
 EMAIL_BLACKLIST = [
     'google', 'gstatic', 'schema', 'sentry', 'cloudflare',
     'facebook', 'twitter', 'instagram', 'test@', 'demo@',
@@ -168,6 +263,7 @@ class GMBScraperPro:
         self.filtered_out = 0
         self.start_time: Optional[datetime] = None
 
+        # Stats temps reel
         self.stats = {
             'total': 0,
             'with_phone': 0,
@@ -177,33 +273,55 @@ class GMBScraperPro:
         }
 
     def _normalize_name(self, name: str) -> str:
-        return re.sub(r'[\s\-\.\'\"]+',' ', name.lower().strip())
+        return re.sub(r'[\s\-\.\'\"]+', ' ', name.lower().strip())
 
     def _clean_phone(self, phone: str) -> str:
         return re.sub(r'[\s\.\-\(\)]', '', phone)
 
     def _is_valid_email(self, email: str) -> bool:
+        """Valide un email"""
         if not email or '@' not in email:
             return False
         email_lower = email.lower()
         if any(x in email_lower for x in EMAIL_BLACKLIST):
             return False
+        # Verifier le format
         if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
             return False
         return True
 
-    def _get_search_zones(self, city: str, grid_size: int) -> List[Tuple[float, float]]:
+    async def _get_search_zones(self, city: str, grid_size: int) -> List[Tuple[float, float]]:
+        """Genere les zones de recherche optimisees pour la ville"""
         city_key = city.lower().strip().replace('-', ' ').replace('_', ' ')
 
-        if 'paris' in city_key:
+        # Paris: utiliser les zones predefinies
+        if 'paris' in city_key and city_key in ['paris', 'paris france']:
+            # Retourner toutes les zones ou un subset selon grid_size
             if grid_size <= 2:
-                return PARIS_ZONES[:9]
+                return PARIS_ZONES[:9]  # Arrondissements centraux
             elif grid_size <= 4:
                 return PARIS_ZONES[:16]
             else:
                 return PARIS_ZONES
 
-        city_data = CITY_DATA.get(city_key, {"center": (48.8566, 2.3522), "radius_km": 5})
+        # Chercher dans les villes predefinies
+        city_data = None
+        for key in CITY_DATA:
+            if key in city_key or city_key in key:
+                city_data = CITY_DATA[key]
+                break
+
+        # Si ville non trouvee, geocoder via Nominatim
+        if city_data is None:
+            emit("status", {"message": f"Geocodage de '{city}'..."})
+            lat, lng = await geocode_city(city)
+
+            if lat is not None and lng is not None:
+                emit("status", {"message": f"Ville trouvee: {city} ({lat:.4f}, {lng:.4f})"})
+                city_data = {"center": (lat, lng), "radius_km": 3}  # Rayon par defaut
+            else:
+                emit("warning", {"message": f"Ville '{city}' non trouvee, utilisation du centre Paris"})
+                city_data = {"center": (48.8566, 2.3522), "radius_km": 5}
 
         if "zones" in city_data:
             return city_data["zones"]
@@ -215,7 +333,7 @@ class GMBScraperPro:
         lng_delta = radius_km / (111.0 * math.cos(math.radians(center_lat)))
 
         points = []
-        actual_grid = min(grid_size, 5)
+        actual_grid = min(grid_size, 5)  # Max 5x5
 
         for i in range(actual_grid):
             for j in range(actual_grid):
@@ -232,6 +350,7 @@ class GMBScraperPro:
         return points
 
     async def _init_browser(self):
+        """Initialise le navigateur avec configuration optimisee"""
         playwright = await async_playwright().start()
 
         self.browser = await playwright.chromium.launch(
@@ -246,9 +365,12 @@ class GMBScraperPro:
         )
 
         self.page = await self.context.new_page()
+
+        # Accepter les cookies
         await self._handle_consent()
 
     async def _handle_consent(self):
+        """Gere le popup de consentement Google"""
         try:
             await self.page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=30000)
             await asyncio.sleep(1.5)
@@ -270,17 +392,20 @@ class GMBScraperPro:
             emit("warning", {"message": f"Consentement non trouve: {e}"})
 
     async def _scroll_results(self) -> int:
+        """Scrolle la liste des resultats et collecte les liens"""
         links_found = set()
         stable_count = 0
         last_count = 0
 
-        for _ in range(20):
+        for _ in range(20):  # Max 20 cycles de scroll
+            # Scroll
             await self.page.evaluate('''
                 const feed = document.querySelector('div[role="feed"]');
                 if (feed) feed.scrollBy(0, 800);
             ''')
             await asyncio.sleep(0.3)
 
+            # Collecter les liens
             new_links = await self.page.evaluate('''
                 () => {
                     const links = [];
@@ -300,6 +425,7 @@ class GMBScraperPro:
                 if key not in self.seen_names:
                     links_found.add((link['name'], link['href']))
 
+            # Verifier fin de liste
             end_reached = await self.page.evaluate('''
                 () => {
                     const feed = document.querySelector('div[role="feed"]');
@@ -314,6 +440,7 @@ class GMBScraperPro:
             if end_reached:
                 break
 
+            # Stabilite
             if len(links_found) == last_count:
                 stable_count += 1
                 if stable_count >= 3:
@@ -325,12 +452,14 @@ class GMBScraperPro:
         return len(links_found)
 
     async def _extract_business_details(self, name: str, url: str) -> Optional[Business]:
+        """Extrait TOUS les details d'une fiche GMB"""
         try:
             await self.page.goto(url, wait_until="domcontentloaded", timeout=20000)
             await asyncio.sleep(1.5)
 
             biz = Business(name=name, google_maps_url=url)
 
+            # Place ID depuis l'URL
             place_match = re.search(r'!1s(0x[a-f0-9]+:0x[a-f0-9]+)', url)
             if place_match:
                 biz.place_id = place_match[1]
@@ -339,11 +468,13 @@ class GMBScraperPro:
                 if place_match:
                     biz.place_id = place_match[1]
 
+            # Coordonnees
             coord_match = re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', url)
             if coord_match:
                 biz.latitude = float(coord_match[1])
                 biz.longitude = float(coord_match[2])
 
+            # ===== TELEPHONE =====
             try:
                 phone_buttons = await self.page.query_selector_all('button[data-item-id*="phone"]')
                 for btn in phone_buttons:
@@ -357,6 +488,7 @@ class GMBScraperPro:
             except:
                 pass
 
+            # Alternative: chercher dans tout le contenu
             if not biz.phone:
                 try:
                     content = await self.page.content()
@@ -367,6 +499,7 @@ class GMBScraperPro:
                 except:
                     pass
 
+            # ===== WEBSITE =====
             try:
                 website_el = await self.page.query_selector('a[data-item-id="authority"]')
                 if website_el:
@@ -376,6 +509,7 @@ class GMBScraperPro:
             except:
                 pass
 
+            # Alternative: lien dans la section
             if not biz.website:
                 try:
                     links = await self.page.query_selector_all('a[href^="http"]')
@@ -389,6 +523,7 @@ class GMBScraperPro:
                 except:
                     pass
 
+            # ===== ADRESSE =====
             try:
                 addr_btn = await self.page.query_selector('button[data-item-id="address"]')
                 if addr_btn:
@@ -398,6 +533,7 @@ class GMBScraperPro:
             except:
                 pass
 
+            # ===== CATEGORIE =====
             try:
                 cat_el = await self.page.query_selector('button[jsaction*="category"]')
                 if cat_el:
@@ -407,6 +543,7 @@ class GMBScraperPro:
             except:
                 pass
 
+            # Alternative pour categorie
             if not biz.category:
                 try:
                     spans = await self.page.query_selector_all('span')
@@ -418,6 +555,7 @@ class GMBScraperPro:
                 except:
                     pass
 
+            # ===== RATING =====
             try:
                 rating_el = await self.page.query_selector('div[role="img"][aria-label*="\u00e9toile"]')
                 if rating_el:
@@ -439,6 +577,7 @@ class GMBScraperPro:
             return None
 
     async def _extract_emails_from_websites(self, businesses: List[Business]) -> Dict[str, str]:
+        """Extrait les emails depuis les sites web en parallele"""
         websites_to_check = [
             (b.place_id or b.name, b.website)
             for b in businesses
@@ -456,7 +595,9 @@ class GMBScraperPro:
         emails_found = {}
 
         async def fetch_email(session: aiohttp.ClientSession, key: str, url: str) -> Tuple[str, Optional[str]]:
+            """Fetch une page et extrait l'email"""
             try:
+                # Nettoyer l'URL
                 if not url.startswith('http'):
                     url = 'https://' + url
 
@@ -466,12 +607,14 @@ class GMBScraperPro:
 
                     html = await resp.text()
 
+                    # Chercher emails
                     emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', html)
 
                     for email in emails:
                         if self._is_valid_email(email):
                             return (key, email)
 
+                    # Chercher page contact
                     contact_links = re.findall(r'href=["\']([^"\']*contact[^"\']*)["\']', html, re.I)
                     for contact_link in contact_links[:2]:
                         try:
@@ -498,6 +641,7 @@ class GMBScraperPro:
             except Exception:
                 return (key, None)
 
+        # Executer en parallele par batches
         connector = aiohttp.TCPConnector(limit=10, force_close=True)
         async with aiohttp.ClientSession(
             connector=connector,
@@ -529,18 +673,21 @@ class GMBScraperPro:
         return emails_found
 
     def _add_business(self, biz: Business) -> bool:
+        """Ajoute un business si valide et unique"""
         if not biz.is_valid():
             self.filtered_out += 1
             return False
 
         norm_name = self._normalize_name(biz.name)
 
+        # Deja vu?
         if norm_name in self.seen_names:
             return False
 
         key = biz.place_id if biz.place_id else f"name_{norm_name}"
 
         if key in self.businesses:
+            # Mise a jour si on a plus d'infos
             existing = self.businesses[key]
             updated = False
             if biz.phone and not existing.phone:
@@ -561,6 +708,7 @@ class GMBScraperPro:
         self.businesses[key] = biz
         self.seen_names.add(norm_name)
 
+        # Mise a jour stats
         self.stats['total'] = len(self.businesses)
         if biz.phone:
             self.stats['with_phone'] += 1
@@ -574,8 +722,10 @@ class GMBScraperPro:
         return True
 
     async def _search_zone(self, query: str, lat: float, lng: float, zone_num: int, total_zones: int) -> int:
+        """Recherche dans une zone et extrait les details de chaque fiche"""
         initial_count = len(self.businesses)
 
+        # URL de recherche avec zoom 15 (niveau rue)
         search_url = f"https://www.google.com/maps/search/{quote(query)}/@{lat},{lng},15z"
 
         try:
@@ -585,6 +735,7 @@ class GMBScraperPro:
             emit("warning", {"message": f"Zone {zone_num}: erreur navigation - {str(e)[:50]}"})
             return 0
 
+        # Collecter les liens
         await self._scroll_results()
 
         links = await self.page.evaluate('''
@@ -601,6 +752,7 @@ class GMBScraperPro:
             }
         ''')
 
+        # Filtrer les doublons
         unique_links = []
         for link in links:
             norm = self._normalize_name(link['name'])
@@ -614,6 +766,7 @@ class GMBScraperPro:
             "unique_new": len(unique_links)
         })
 
+        # Extraire les details de chaque fiche
         for idx, link in enumerate(unique_links):
             biz = await self._extract_business_details(link['name'], link['href'])
 
@@ -624,6 +777,7 @@ class GMBScraperPro:
                     "index_in_zone": idx + 1
                 })
 
+                # Emettre stats mises a jour
                 emit("stats_update", {
                     "total": self.stats['total'],
                     "with_phone": self.stats['with_phone'],
@@ -632,14 +786,16 @@ class GMBScraperPro:
                     "with_address": self.stats['with_address']
                 })
 
+            # Petit delai pour eviter detection
             await asyncio.sleep(0.3)
 
         return len(self.businesses) - initial_count
 
     async def scrape(self, business_type: str, city: str, grid_size: int = 4) -> List[Business]:
+        """Lance le scraping complet"""
         self.start_time = datetime.now()
 
-        zones = self._get_search_zones(city, grid_size)
+        zones = await self._get_search_zones(city, grid_size)
         total_zones = len(zones)
 
         emit("start", {
@@ -648,13 +804,14 @@ class GMBScraperPro:
             "grid_size": grid_size,
             "total_zones": total_zones,
             "zones": [(round(lat, 4), round(lng, 4)) for lat, lng in zones],
-            "version": "v15-pro"
+            "version": "v15.1-pro"
         })
 
         try:
             emit("status", {"message": "Initialisation du navigateur..."})
             await self._init_browser()
 
+            # Phase 1: Scraping de chaque zone
             for zone_num, (lat, lng) in enumerate(zones, 1):
                 emit("zone_start", {
                     "zone": zone_num,
@@ -677,6 +834,7 @@ class GMBScraperPro:
                     "percent": round(100 * zone_num / total_zones, 1)
                 })
 
+            # Phase 2: Extraction emails depuis les sites web
             businesses_list = list(self.businesses.values())
 
             if any(b.website for b in businesses_list):
@@ -684,17 +842,20 @@ class GMBScraperPro:
 
                 emails_found = await self._extract_emails_from_websites(businesses_list)
 
+                # Mettre a jour les businesses avec les emails trouves
                 for key, email in emails_found.items():
                     if key in self.businesses:
                         self.businesses[key].email = email
                         self.stats['with_email'] += 1
                     else:
+                        # Chercher par nom
                         for biz_key, biz in self.businesses.items():
                             if key == biz.name and not biz.email:
                                 biz.email = email
                                 self.stats['with_email'] += 1
                                 break
 
+            # Stats finales
             elapsed = (datetime.now() - self.start_time).total_seconds()
             businesses_list = list(self.businesses.values())
 
