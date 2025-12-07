@@ -40,8 +40,8 @@ COPY scraper ./scraper
 # Copy public folder for web frontend
 COPY public ./public
 
-# Install Python dependencies
-RUN pip3 install playwright && \
+# Install Python dependencies (playwright + aiohttp for parallel email extraction)
+RUN pip3 install playwright aiohttp && \
     playwright install chromium && \
     playwright install-deps chromium
 
