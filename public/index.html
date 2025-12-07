@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GMB Scraper</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #fff;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .form-card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 30px;
+      margin-bottom: 30px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 120px 150px;
+      gap: 15px;
+      align-items: end;
+    }
+
+    @media (max-width: 768px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #a0a0a0;
+    }
+
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.3);
+      color: #fff;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #00d4ff;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0,212,255,0.3);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-success {
+      background: linear-gradient(90deg, #00c853, #00e676);
+      color: #fff;
+    }
+
+    .btn-success:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0,200,83,0.3);
+    }
+
+    .btn-danger {
+      background: linear-gradient(90deg, #ff5252, #ff1744);
+      color: #fff;
+    }
+
+    .progress-card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 25px;
+      margin-bottom: 30px;
+      border: 1px solid rgba(255,255,255,0.1);
+      display: none;
+    }
+
+    .progress-card.active { display: block; }
+
+    .progress-bar-container {
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      height: 20px;
+      overflow: hidden;
+      margin: 15px 0;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      border-radius: 10px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .stat-item {
+      background: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #00d4ff;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: #a0a0a0;
+      margin-top: 5px;
+    }
+
+    .results-card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 25px;
+      border: 1px solid rgba(255,255,255,0.1);
+      display: none;
+    }
+
+    .results-card.active { display: block; }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .results-table-container {
+      overflow-x: auto;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      white-space: nowrap;
+    }
+
+    th {
+      background: rgba(0,212,255,0.2);
+      position: sticky;
+      top: 0;
+      font-weight: 600;
+    }
+
+    tr:hover td {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .log-container {
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .log-entry {
+      padding: 3px 0;
+      color: #a0a0a0;
+    }
+
+    .log-entry.success { color: #00e676; }
+    .log-entry.error { color: #ff5252; }
+    .log-entry.info { color: #00d4ff; }
+
+    .hidden { display: none !important; }
+
+    .api-key-input {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 10px 15px;
+      color: #fff;
+      font-family: monospace;
+      width: 300px;
+      margin-bottom: 20px;
+    }
+
+    .api-key-input:focus {
+      outline: none;
+      border-color: #00d4ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>GMB Scraper</h1>
+
+    <div class="form-card">
+      <div style="margin-bottom: 15px;">
+        <label style="color: #a0a0a0; margin-right: 10px;">API Key:</label>
+        <input type="password" id="apiKey" class="api-key-input" placeholder="Entrez votre API key" value="">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Activite</label>
+          <input type="text" id="activity" placeholder="Ex: restaurant, coiffeur, agence immobiliere">
+        </div>
+        <div class="form-group">
+          <label>Ville</label>
+          <input type="text" id="city" placeholder="Ex: paris, lyon, marseille">
+        </div>
+        <div class="form-group">
+          <label>Grille</label>
+          <select id="gridSize">
+            <option value="2">2x2 (rapide)</option>
+            <option value="3" selected>3x3</option>
+            <option value="4">4x4</option>
+            <option value="5">5x5</option>
+            <option value="6">6x6 (complet)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <button id="startBtn" class="btn btn-primary" onclick="startScraping()">Lancer</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="progressCard" class="progress-card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>Scraping en cours...</h3>
+        <button class="btn btn-danger" onclick="stopScraping()">Arreter</button>
+      </div>
+      <div class="progress-bar-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <p id="progressText" style="color: #a0a0a0;">Initialisation...</p>
+
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div id="statTotal" class="stat-value">0</div>
+          <div class="stat-label">Total trouve</div>
+        </div>
+        <div class="stat-item">
+          <div id="statPhone" class="stat-value">0</div>
+          <div class="stat-label">Avec telephone</div>
+        </div>
+        <div class="stat-item">
+          <div id="statEmail" class="stat-value">0</div>
+          <div class="stat-label">Avec email</div>
+        </div>
+        <div class="stat-item">
+          <div id="statWebsite" class="stat-value">0</div>
+          <div class="stat-label">Avec site web</div>
+        </div>
+      </div>
+
+      <div id="logContainer" class="log-container"></div>
+    </div>
+
+    <div id="resultsCard" class="results-card">
+      <div class="results-header">
+        <h3><span id="resultsCount">0</span> resultats</h3>
+        <div>
+          <button class="btn btn-success" onclick="downloadCSV()">Telecharger CSV</button>
+        </div>
+      </div>
+
+      <div class="results-table-container">
+        <table id="resultsTable">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Telephone</th>
+              <th>Email</th>
+              <th>Adresse</th>
+              <th>Site Web</th>
+              <th>Note</th>
+              <th>Avis</th>
+              <th>Categorie</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let eventSource = null;
+    let businesses = [];
+    let currentStats = { with_phone: 0, with_email: 0, with_website: 0 };
+
+    function log(message, type = '') {
+      const container = document.getElementById('logContainer');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry ' + type;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      container.appendChild(entry);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function startScraping() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const activity = document.getElementById('activity').value.trim();
+      const city = document.getElementById('city').value.trim();
+      const gridSize = document.getElementById('gridSize').value;
+
+      if (!apiKey) {
+        alert('Veuillez entrer votre API key');
+        return;
+      }
+
+      if (!activity || !city) {
+        alert('Veuillez remplir tous les champs');
+        return;
+      }
+
+      // Reset
+      businesses = [];
+      currentStats = { with_phone: 0, with_email: 0, with_website: 0 };
+      document.getElementById('resultsBody').innerHTML = '';
+      document.getElementById('logContainer').innerHTML = '';
+      document.getElementById('progressBar').style.width = '0%';
+      document.getElementById('statTotal').textContent = '0';
+      document.getElementById('statPhone').textContent = '0';
+      document.getElementById('statEmail').textContent = '0';
+      document.getElementById('statWebsite').textContent = '0';
+
+      // Show progress
+      document.getElementById('progressCard').classList.add('active');
+      document.getElementById('resultsCard').classList.remove('active');
+      document.getElementById('startBtn').disabled = true;
+
+      log(`Demarrage: ${activity} a ${city} (grille ${gridSize}x${gridSize})`, 'info');
+
+      // Build URL
+      const baseUrl = window.location.origin;
+      const url = `${baseUrl}/api/scrape/stream?activity=${encodeURIComponent(activity)}&city=${encodeURIComponent(city)}&grid_size=${gridSize}&api_key=${encodeURIComponent(apiKey)}`;
+
+      eventSource = new EventSource(url);
+
+      eventSource.addEventListener('start', (e) => {
+        const data = JSON.parse(e.data);
+        log(`Recherche lancee: ${data.total_zones} zones a scanner`, 'info');
+      });
+
+      eventSource.addEventListener('progress', (e) => {
+        const data = JSON.parse(e.data);
+        const percent = data.percent || Math.round((data.zone / data.total_zones) * 100);
+        document.getElementById('progressBar').style.width = percent + '%';
+        document.getElementById('progressText').textContent =
+          `Zone ${data.zone}/${data.total_zones} - ${data.total_businesses} entreprises trouvees`;
+        document.getElementById('statTotal').textContent = data.total_businesses;
+      });
+
+      eventSource.addEventListener('business', (e) => {
+        const data = JSON.parse(e.data);
+        // Handle both nested and flat structure
+        const biz = data.data || data;
+
+        if (biz && biz.name) {
+          businesses.push(biz);
+
+          // Update stats
+          if (biz.phone && biz.phone !== 'N/A') currentStats.with_phone++;
+          if (biz.email && biz.email !== 'N/A') currentStats.with_email++;
+          if (biz.website && biz.website !== 'N/A') currentStats.with_website++;
+
+          document.getElementById('statTotal').textContent = businesses.length;
+          document.getElementById('statPhone').textContent = currentStats.with_phone;
+          document.getElementById('statEmail').textContent = currentStats.with_email;
+          document.getElementById('statWebsite').textContent = currentStats.with_website;
+
+          // Add to table
+          addToTable(biz);
+        }
+      });
+
+      eventSource.addEventListener('complete', (e) => {
+        const data = JSON.parse(e.data);
+        log(`Termine! ${businesses.length} entreprises trouvees`, 'success');
+
+        if (data.stats) {
+          document.getElementById('statPhone').textContent = data.stats.with_phone;
+          document.getElementById('statEmail').textContent = data.stats.with_email;
+          document.getElementById('statWebsite').textContent = data.stats.with_website;
+        }
+
+        finishScraping();
+      });
+
+      eventSource.addEventListener('error', (e) => {
+        if (e.data) {
+          const data = JSON.parse(e.data);
+          log(`Erreur: ${data.message}`, 'error');
+        }
+      });
+
+      eventSource.onerror = (e) => {
+        if (eventSource.readyState === EventSource.CLOSED) {
+          log('Connexion fermee', 'info');
+          finishScraping();
+        } else {
+          log('Erreur de connexion', 'error');
+        }
+      };
+    }
+
+    function addToTable(biz) {
+      const tbody = document.getElementById('resultsBody');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(biz.name || '')}</td>
+        <td>${escapeHtml(biz.phone || biz.phone_clean || '')}</td>
+        <td>${escapeHtml(biz.email || '')}</td>
+        <td>${escapeHtml(biz.address || '')}</td>
+        <td>${biz.website && biz.website !== 'N/A' ? `<a href="${escapeHtml(biz.website)}" target="_blank" style="color:#00d4ff">Lien</a>` : ''}</td>
+        <td>${biz.rating || ''}</td>
+        <td>${biz.review_count || ''}</td>
+        <td>${escapeHtml(biz.category || '')}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function stopScraping() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      log('Arrete par l\'utilisateur', 'info');
+      finishScraping();
+    }
+
+    function finishScraping() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('progressBar').style.width = '100%';
+      document.getElementById('resultsCount').textContent = businesses.length;
+
+      if (businesses.length > 0) {
+        document.getElementById('resultsCard').classList.add('active');
+      }
+    }
+
+    function downloadCSV() {
+      if (businesses.length === 0) {
+        alert('Aucune donnee a exporter');
+        return;
+      }
+
+      // CSV headers
+      const headers = ['name', 'phone', 'phone_clean', 'email', 'address', 'website', 'rating', 'review_count', 'category', 'latitude', 'longitude', 'place_id', 'google_maps_url'];
+
+      // Build CSV
+      let csv = headers.join(';') + '\n';
+
+      for (const biz of businesses) {
+        const row = headers.map(h => {
+          let val = biz[h] || '';
+          // Escape quotes and wrap in quotes if contains separator or quotes
+          if (typeof val === 'string') {
+            val = val.replace(/"/g, '""');
+            if (val.includes(';') || val.includes('"') || val.includes('\n')) {
+              val = '"' + val + '"';
+            }
+          }
+          return val;
+        });
+        csv += row.join(';') + '\n';
+      }
+
+      // Download
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gmb_${document.getElementById('activity').value}_${document.getElementById('city').value}_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      log('CSV telecharge!', 'success');
+    }
+
+    // Auto-fill API key if stored
+    const storedKey = localStorage.getItem('gmb_api_key');
+    if (storedKey) {
+      document.getElementById('apiKey').value = storedKey;
+    }
+
+    // Save API key on change
+    document.getElementById('apiKey').addEventListener('change', (e) => {
+      localStorage.setItem('gmb_api_key', e.target.value);
+    });
+  </script>
+</body>
+</html>

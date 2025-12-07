@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
@@ -27,6 +28,10 @@ app.use('*', prettyJSON());
 // ROUTES PUBLIQUES
 // ============================================================================
 
+// Servir l'application web (page d'accueil)
+app.get('/', serveStatic({ path: './public/index.html' }));
+app.get('/app', serveStatic({ path: './public/index.html' }));
+
 // Health check
 app.get('/health', async (c) => {
   const pythonOk = await checkPython();
@@ -44,26 +49,26 @@ app.get('/health', async (c) => {
   });
 });
 
-// Documentation
-app.get('/', (c) => {
+// Documentation API (JSON)
+app.get('/api/docs', (c) => {
   return c.json({
     name: 'GMB Scraper API',
     version: config.version,
     description: 'API de scraping Google My Business avec streaming SSE',
     endpoints: {
-      'GET /health': 'Vérification de l\'état de l\'API',
-      'GET /api/scrape/stream?activity=...&city=...': 'Scraping avec streaming SSE (temps réel)',
+      'GET /health': 'Vérification de l\'etat de l\'API',
+      'GET /api/scrape/stream?activity=...&city=...': 'Scraping avec streaming SSE (temps reel)',
       'POST /api/scrape': 'Scraping synchrone (attend la fin)',
-      'POST /api/scrape/webhook': '⭐ Mode webhook pour n8n (async + callback)',
-      'GET /api/scrape/:jobId': 'Récupérer les résultats d\'un job',
-      'GET /api/scrape/info/cities': 'Liste des villes supportées',
-      'POST /api/generate-key': 'Générer une nouvelle clé API (dev only)'
+      'POST /api/scrape/webhook': 'Mode webhook pour n8n (async + callback)',
+      'GET /api/scrape/:jobId': 'Recuperer les resultats d\'un job',
+      'GET /api/scrape/info/cities': 'Liste des villes supportees',
+      'POST /api/generate-key': 'Generer une nouvelle cle API (dev only)'
     },
     authentication: {
       methods: [
-        'Header: X-API-Key: <votre_clé>',
-        'Header: Authorization: Bearer <votre_clé>',
-        'Query param: ?api_key=<votre_clé>'
+        'Header: X-API-Key: <votre_cle>',
+        'Header: Authorization: Bearer <votre_cle>',
+        'Query param: ?api_key=<votre_cle>'
       ]
     },
     examples: {
@@ -82,7 +87,7 @@ app.get('/', (c) => {
           grid_size: 3,
           webhook_url: 'https://votre-n8n.com/webhook/xxx'
         },
-        note: 'Retour immédiat + callback webhook quand terminé'
+        note: 'Retour immediat + callback webhook quand termine'
       }
     },
     supported_cities: SUPPORTED_CITIES.slice(0, 10).concat(['...'] as any),
@@ -90,14 +95,14 @@ app.get('/', (c) => {
   });
 });
 
-// Générer une clé API (mode dev uniquement)
+// Generer une cle API (mode dev uniquement)
 app.post('/api/generate-key', (c) => {
   const newKey = generateApiKey();
   return c.json({
     success: true,
     data: {
       api_key: newKey,
-      note: 'Ajoutez cette clé à votre variable d\'environnement API_KEYS'
+      note: 'Ajoutez cette cle a votre variable d\'environnement API_KEYS'
     },
     timestamp: new Date().toISOString()
   });
@@ -120,7 +125,7 @@ app.route('/api/scrape', scrapeRouter);
 app.notFound((c) => {
   return c.json({
     success: false,
-    error: 'Route non trouvée',
+    error: 'Route non trouvee',
     available_routes: ['/', '/health', '/api/scrape', '/api/scrape/stream'],
     timestamp: new Date().toISOString()
   }, 404);
@@ -142,20 +147,20 @@ app.onError((err, c) => {
 const port = config.port;
 
 console.log(`
-╔══════════════════════════════════════════════════════════════════╗
-║                     GMB SCRAPER API v${config.version}                       ║
-╠══════════════════════════════════════════════════════════════════╣
-║  Endpoints:                                                      ║
-║  • GET  /                          Documentation                 ║
-║  • GET  /health                    Health check                  ║
-║  • GET  /api/scrape/stream         Streaming SSE                 ║
-║  • POST /api/scrape                Scraping synchrone            ║
-║  • POST /api/scrape/webhook        Mode webhook (n8n)            ║
-║  • GET  /api/scrape/:jobId         Récupérer un job              ║
-║  • GET  /api/scrape/info/cities    Villes supportées             ║
-╠══════════════════════════════════════════════════════════════════╣
-║  Serveur démarré sur http://localhost:${port.toString().padEnd(25, ' ')}║
-╚══════════════════════════════════════════════════════════════════╝
+======================================================================
+                     GMB SCRAPER API v${config.version}
+======================================================================
+  Endpoints:
+  - GET  /                          Application Web
+  - GET  /health                    Health check
+  - GET  /api/docs                  Documentation API
+  - GET  /api/scrape/stream         Streaming SSE
+  - POST /api/scrape                Scraping synchrone
+  - POST /api/scrape/webhook        Mode webhook (n8n)
+  - GET  /api/scrape/:jobId         Recuperer un job
+======================================================================
+  Serveur demarre sur http://localhost:${port}
+======================================================================
 `);
 
 serve({
