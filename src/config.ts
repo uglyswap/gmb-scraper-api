@@ -9,7 +9,7 @@ export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   pythonPath: process.env.PYTHON_PATH || 'python',
   debug: process.env.DEBUG === 'true',
-  version: '1.0.0',
+  version: '2.0.0', // V16 ULTIMATE - API Interception + Dynamic Geocoding + Email Extraction
   startTime: Date.now(),
 };
 
