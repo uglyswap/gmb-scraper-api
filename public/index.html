@@ -123,6 +123,33 @@
 
     .progress-card.active { display: block; }
 
+    .phase-indicator {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .phase-badge {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: rgba(255,255,255,0.1);
+      color: #666;
+      transition: all 0.3s;
+    }
+
+    .phase-badge.active {
+      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(0,212,255,0.3);
+    }
+
+    .phase-badge.completed {
+      background: linear-gradient(90deg, #00c853, #00e676);
+      color: #fff;
+    }
+
     .progress-bar-container {
       background: rgba(0,0,0,0.3);
       border-radius: 10px;
@@ -139,9 +166,13 @@
       width: 0%;
     }
 
+    .progress-bar.email-phase {
+      background: linear-gradient(90deg, #ff9800, #ff5722);
+    }
+
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
       gap: 15px;
       margin-top: 20px;
     }
@@ -151,6 +182,17 @@
       padding: 15px;
       border-radius: 10px;
       text-align: center;
+      transition: transform 0.3s;
+    }
+
+    .stat-item.highlight {
+      animation: pulse 0.5s ease;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
     }
 
     .stat-value {
@@ -159,10 +201,20 @@
       color: #00d4ff;
     }
 
+    .stat-value.phone { color: #4caf50; }
+    .stat-value.email { color: #ff9800; }
+    .stat-value.website { color: #9c27b0; }
+
     .stat-label {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       color: #a0a0a0;
       margin-top: 5px;
+    }
+
+    .stat-change {
+      font-size: 0.75rem;
+      color: #00e676;
+      margin-top: 3px;
     }
 
     .results-card {
@@ -214,6 +266,15 @@
       background: rgba(255,255,255,0.05);
     }
 
+    tr.new-email td {
+      animation: newEmail 1s ease;
+    }
+
+    @keyframes newEmail {
+      0% { background: rgba(255,152,0,0.3); }
+      100% { background: transparent; }
+    }
+
     .log-container {
       background: rgba(0,0,0,0.3);
       border-radius: 10px;
@@ -233,6 +294,7 @@
     .log-entry.success { color: #00e676; }
     .log-entry.error { color: #ff5252; }
     .log-entry.info { color: #00d4ff; }
+    .log-entry.email { color: #ff9800; }
 
     .hidden { display: none !important; }
 
@@ -250,6 +312,47 @@
     .api-key-input:focus {
       outline: none;
       border-color: #00d4ff;
+    }
+
+    .email-extraction-info {
+      background: rgba(255,152,0,0.1);
+      border: 1px solid rgba(255,152,0,0.3);
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .email-extraction-info.active {
+      display: block;
+    }
+
+    .email-extraction-info h4 {
+      color: #ff9800;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .email-extraction-info .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,152,0,0.3);
+      border-top-color: #ff9800;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .email-progress {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #a0a0a0;
     }
   </style>
 </head>
@@ -290,9 +393,16 @@
 
     <div id="progressCard" class="progress-card">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3>Scraping en cours...</h3>
+        <h3 id="progressTitle">Scraping en cours...</h3>
         <button class="btn btn-danger" onclick="stopScraping()">Arreter</button>
       </div>
+
+      <div class="phase-indicator">
+        <span id="phase1" class="phase-badge active">1. Scan GMB</span>
+        <span id="phase2" class="phase-badge">2. Enrichissement</span>
+        <span id="phase3" class="phase-badge">3. Extraction Emails</span>
+      </div>
+
       <div class="progress-bar-container">
         <div id="progressBar" class="progress-bar"></div>
       </div>
@@ -304,16 +414,31 @@
           <div class="stat-label">Total trouve</div>
         </div>
         <div class="stat-item">
-          <div id="statPhone" class="stat-value">0</div>
-          <div class="stat-label">Avec telephone</div>
+          <div id="statPhone" class="stat-value phone">0</div>
+          <div class="stat-label">Telephones</div>
+          <div id="phoneChange" class="stat-change"></div>
         </div>
         <div class="stat-item">
-          <div id="statEmail" class="stat-value">0</div>
-          <div class="stat-label">Avec email</div>
+          <div id="statEmail" class="stat-value email">0</div>
+          <div class="stat-label">Emails</div>
+          <div id="emailChange" class="stat-change"></div>
         </div>
         <div class="stat-item">
-          <div id="statWebsite" class="stat-value">0</div>
-          <div class="stat-label">Avec site web</div>
+          <div id="statWebsite" class="stat-value website">0</div>
+          <div class="stat-label">Sites web</div>
+        </div>
+        <div class="stat-item">
+          <div id="statEmailExtracted" class="stat-value email">0</div>
+          <div class="stat-label">Emails extraits</div>
+          <div id="emailExtractedChange" class="stat-change"></div>
+        </div>
+      </div>
+
+      <div id="emailExtractionInfo" class="email-extraction-info">
+        <h4><span class="spinner"></span> Extraction emails depuis les sites web</h4>
+        <div class="email-progress">
+          <span id="emailProgressText">Analyse des sites web...</span>
+          <span id="emailProgressCount">0 / 0</span>
         </div>
       </div>
 
@@ -351,7 +476,11 @@
   <script>
     let eventSource = null;
     let businesses = [];
-    let currentStats = { with_phone: 0, with_email: 0, with_website: 0 };
+    let businessMap = new Map(); // For quick lookup by place_id
+    let currentStats = { with_phone: 0, with_email: 0, with_website: 0, emails_extracted: 0 };
+    let currentPhase = 1;
+    let emailExtractionTotal = 0;
+    let emailExtractionDone = 0;
 
     function log(message, type = '') {
       const container = document.getElementById('logContainer');
@@ -360,6 +489,43 @@
       entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
       container.appendChild(entry);
       container.scrollTop = container.scrollHeight;
+    }
+
+    function setPhase(phase) {
+      currentPhase = phase;
+      for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById('phase' + i);
+        el.classList.remove('active', 'completed');
+        if (i < phase) el.classList.add('completed');
+        if (i === phase) el.classList.add('active');
+      }
+
+      const progressBar = document.getElementById('progressBar');
+      if (phase === 3) {
+        progressBar.classList.add('email-phase');
+        document.getElementById('emailExtractionInfo').classList.add('active');
+        document.getElementById('progressTitle').textContent = 'Extraction emails...';
+      } else {
+        progressBar.classList.remove('email-phase');
+        document.getElementById('emailExtractionInfo').classList.remove('active');
+      }
+    }
+
+    function updateStat(id, value, changeId = null) {
+      const el = document.getElementById(id);
+      const oldValue = parseInt(el.textContent) || 0;
+      el.textContent = value;
+
+      if (value > oldValue) {
+        el.parentElement.classList.add('highlight');
+        setTimeout(() => el.parentElement.classList.remove('highlight'), 500);
+
+        if (changeId) {
+          const changeEl = document.getElementById(changeId);
+          changeEl.textContent = '+' + (value - oldValue);
+          setTimeout(() => changeEl.textContent = '', 2000);
+        }
+      }
     }
 
     function startScraping() {
@@ -380,19 +546,26 @@
 
       // Reset
       businesses = [];
-      currentStats = { with_phone: 0, with_email: 0, with_website: 0 };
+      businessMap = new Map();
+      currentStats = { with_phone: 0, with_email: 0, with_website: 0, emails_extracted: 0 };
+      emailExtractionTotal = 0;
+      emailExtractionDone = 0;
       document.getElementById('resultsBody').innerHTML = '';
       document.getElementById('logContainer').innerHTML = '';
       document.getElementById('progressBar').style.width = '0%';
-      document.getElementById('statTotal').textContent = '0';
-      document.getElementById('statPhone').textContent = '0';
-      document.getElementById('statEmail').textContent = '0';
-      document.getElementById('statWebsite').textContent = '0';
+      document.getElementById('progressBar').classList.remove('email-phase');
+      updateStat('statTotal', 0);
+      updateStat('statPhone', 0);
+      updateStat('statEmail', 0);
+      updateStat('statWebsite', 0);
+      updateStat('statEmailExtracted', 0);
+      setPhase(1);
 
       // Show progress
       document.getElementById('progressCard').classList.add('active');
       document.getElementById('resultsCard').classList.remove('active');
       document.getElementById('startBtn').disabled = true;
+      document.getElementById('progressTitle').textContent = 'Scraping en cours...';
 
       log(`Demarrage: ${activity} a ${city} (grille ${gridSize}x${gridSize})`, 'info');
 
@@ -405,6 +578,7 @@
       eventSource.addEventListener('start', (e) => {
         const data = JSON.parse(e.data);
         log(`Recherche lancee: ${data.total_zones} zones a scanner`, 'info');
+        setPhase(1);
       });
 
       eventSource.addEventListener('progress', (e) => {
@@ -413,7 +587,61 @@
         document.getElementById('progressBar').style.width = percent + '%';
         document.getElementById('progressText').textContent =
           `Zone ${data.zone}/${data.total_zones} - ${data.total_businesses} entreprises trouvees`;
-        document.getElementById('statTotal').textContent = data.total_businesses;
+        updateStat('statTotal', data.total_businesses);
+      });
+
+      eventSource.addEventListener('enrichment_start', (e) => {
+        log('Phase 2: Enrichissement des fiches GMB...', 'info');
+        setPhase(2);
+      });
+
+      eventSource.addEventListener('enrichment_progress', (e) => {
+        const data = JSON.parse(e.data);
+        const percent = Math.round((data.current / data.total) * 100);
+        document.getElementById('progressBar').style.width = percent + '%';
+        document.getElementById('progressText').textContent =
+          `Enrichissement: ${data.current}/${data.total} fiches`;
+      });
+
+      eventSource.addEventListener('email_extraction_start', (e) => {
+        const data = JSON.parse(e.data);
+        log(`Phase 3: Extraction emails depuis ${data.total_sites} sites web...`, 'email');
+        setPhase(3);
+        emailExtractionTotal = data.total_sites;
+        emailExtractionDone = 0;
+        document.getElementById('emailProgressCount').textContent = `0 / ${emailExtractionTotal}`;
+        document.getElementById('progressBar').style.width = '0%';
+      });
+
+      eventSource.addEventListener('email_extraction_progress', (e) => {
+        const data = JSON.parse(e.data);
+        emailExtractionDone = data.current;
+        const percent = Math.round((data.current / data.total) * 100);
+        document.getElementById('progressBar').style.width = percent + '%';
+        document.getElementById('emailProgressCount').textContent = `${data.current} / ${data.total}`;
+        document.getElementById('emailProgressText').textContent = `${data.emails_found} emails trouves`;
+        document.getElementById('progressText').textContent =
+          `Extraction emails: ${data.current}/${data.total} sites analyses`;
+      });
+
+      eventSource.addEventListener('email_found', (e) => {
+        const data = JSON.parse(e.data);
+        log(`Email trouve: ${data.email} (${data.business_name})`, 'email');
+        currentStats.emails_extracted++;
+        updateStat('statEmailExtracted', currentStats.emails_extracted, 'emailExtractedChange');
+
+        // Update the business in our list
+        if (data.place_id && businessMap.has(data.place_id)) {
+          const biz = businessMap.get(data.place_id);
+          if (!biz.email || biz.email === 'N/A') {
+            biz.email = data.email;
+            currentStats.with_email++;
+            updateStat('statEmail', currentStats.with_email, 'emailChange');
+
+            // Update table row
+            updateTableRow(biz);
+          }
+        }
       });
 
       eventSource.addEventListener('business', (e) => {
@@ -423,16 +651,19 @@
 
         if (biz && biz.name) {
           businesses.push(biz);
+          if (biz.place_id) {
+            businessMap.set(biz.place_id, biz);
+          }
 
           // Update stats
           if (biz.phone && biz.phone !== 'N/A') currentStats.with_phone++;
           if (biz.email && biz.email !== 'N/A') currentStats.with_email++;
           if (biz.website && biz.website !== 'N/A') currentStats.with_website++;
 
-          document.getElementById('statTotal').textContent = businesses.length;
-          document.getElementById('statPhone').textContent = currentStats.with_phone;
-          document.getElementById('statEmail').textContent = currentStats.with_email;
-          document.getElementById('statWebsite').textContent = currentStats.with_website;
+          updateStat('statTotal', businesses.length);
+          updateStat('statPhone', currentStats.with_phone, 'phoneChange');
+          updateStat('statEmail', currentStats.with_email, 'emailChange');
+          updateStat('statWebsite', currentStats.with_website);
 
           // Add to table
           addToTable(biz);
@@ -444,9 +675,15 @@
         log(`Termine! ${businesses.length} entreprises trouvees`, 'success');
 
         if (data.stats) {
-          document.getElementById('statPhone').textContent = data.stats.with_phone;
-          document.getElementById('statEmail').textContent = data.stats.with_email;
-          document.getElementById('statWebsite').textContent = data.stats.with_website;
+          updateStat('statPhone', data.stats.with_phone);
+          updateStat('statEmail', data.stats.with_email);
+          updateStat('statWebsite', data.stats.with_website);
+        }
+
+        // Mark all phases as completed
+        for (let i = 1; i <= 3; i++) {
+          document.getElementById('phase' + i).classList.remove('active');
+          document.getElementById('phase' + i).classList.add('completed');
         }
 
         finishScraping();
@@ -472,10 +709,11 @@
     function addToTable(biz) {
       const tbody = document.getElementById('resultsBody');
       const tr = document.createElement('tr');
+      tr.id = 'row-' + (biz.place_id || businesses.length);
       tr.innerHTML = `
         <td>${escapeHtml(biz.name || '')}</td>
         <td>${escapeHtml(biz.phone || biz.phone_clean || '')}</td>
-        <td>${escapeHtml(biz.email || '')}</td>
+        <td class="email-cell">${escapeHtml(biz.email || '')}</td>
         <td>${escapeHtml(biz.address || '')}</td>
         <td>${biz.website && biz.website !== 'N/A' ? `<a href="${escapeHtml(biz.website)}" target="_blank" style="color:#00d4ff">Lien</a>` : ''}</td>
         <td>${biz.rating || ''}</td>
@@ -483,6 +721,18 @@
         <td>${escapeHtml(biz.category || '')}</td>
       `;
       tbody.appendChild(tr);
+    }
+
+    function updateTableRow(biz) {
+      const tr = document.getElementById('row-' + biz.place_id);
+      if (tr) {
+        const emailCell = tr.querySelector('.email-cell');
+        if (emailCell) {
+          emailCell.textContent = biz.email || '';
+          tr.classList.add('new-email');
+          setTimeout(() => tr.classList.remove('new-email'), 1000);
+        }
+      }
     }
 
     function escapeHtml(text) {
@@ -510,6 +760,8 @@
       document.getElementById('startBtn').disabled = false;
       document.getElementById('progressBar').style.width = '100%';
       document.getElementById('resultsCount').textContent = businesses.length;
+      document.getElementById('emailExtractionInfo').classList.remove('active');
+      document.getElementById('progressTitle').textContent = 'Termine!';
 
       if (businesses.length > 0) {
         document.getElementById('resultsCard').classList.add('active');
