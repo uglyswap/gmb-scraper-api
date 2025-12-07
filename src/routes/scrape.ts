@@ -12,7 +12,7 @@ const scrapeRouter = new Hono();
 const WebhookScrapeSchema = z.object({
   activity: z.string().min(2, 'Activité requise (min 2 caractères)'),
   city: z.string().min(2, 'Ville requise (min 2 caractères)'),
-  grid_size: z.coerce.number().int().min(1).max(6).default(4),
+  grid_size: z.coerce.number().int().min(1).max(10).default(4),
   webhook_url: z.string().url('URL webhook invalide'),
 });
 
@@ -145,7 +145,7 @@ scrapeRouter.post('/', async (c) => {
       usage: {
         activity: 'Type de business (ex: "restaurant", "coiffeur", "agence immobiliere")',
         city: `Ville (${SUPPORTED_CITIES.slice(0, 5).join(', ')}...)`,
-        grid_size: 'Taille de la grille 1-6 (défaut: 4)'
+        grid_size: 'Taille de la grille 1-10 (défaut: 4)'
       },
       timestamp: new Date().toISOString()
     }, 400);
@@ -228,7 +228,7 @@ scrapeRouter.post('/webhook', async (c) => {
       usage: {
         activity: 'Type de business (ex: "restaurant", "coiffeur")',
         city: `Ville (${SUPPORTED_CITIES.slice(0, 5).join(', ')}...)`,
-        grid_size: 'Taille de la grille 1-6 (défaut: 4)',
+        grid_size: 'Taille de la grille 1-10 (défaut: 4)',
         webhook_url: 'URL du webhook n8n à appeler quand terminé'
       },
       timestamp: new Date().toISOString()
