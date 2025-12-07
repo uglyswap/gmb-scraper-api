@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GMB Scraper v13 - Version API avec streaming NDJSON
+GMB Scraper v14 - Version API avec streaming NDJSON + Email extraction
 Utilise l'interception de l'API interne Google Maps pour extraction complete
-Inclut: email, website, telephone, adresse complete
+Inclut: extraction d'emails depuis les sites web des entreprises
 """
 
 import asyncio
@@ -12,15 +12,17 @@ import re
 import math
 import sys
 import io
+import aiohttp
+from aiohttp import ClientTimeout
 
 # Force UTF-8 output pour eviter les problemes d'encodage
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from dataclasses import dataclass, asdict
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Set
 from datetime import datetime
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlparse
 
 try:
     from playwright.async_api import async_playwright, Page, Browser, BrowserContext
@@ -85,8 +87,24 @@ EMAIL_BLACKLIST = [
     'google', 'gstatic', 'schema', 'sentry', 'cloudflare',
     'facebook', 'twitter', 'instagram', 'test@', 'demo@',
     'noreply', 'no-reply', 'example', 'googleapis', 'w3.org',
-    'googleusercontent'
+    'googleusercontent', 'wixpress', 'squarespace', 'wordpress',
+    'sentry.io', 'jquery', 'bootstrap', 'fontawesome', 'cdn',
+    'privacy@', 'abuse@', 'postmaster@', 'webmaster@', 'hostmaster@',
+    'placeholder', 'your-email', 'email@', 'name@', 'info@example',
+    'user@', 'admin@example', 'support@example'
 ]
+
+# Pages a visiter pour trouver les emails
+EMAIL_PAGES = [
+    '', '/contact', '/contact-us', '/contactez-nous', '/nous-contacter',
+    '/mentions-legales', '/legal', '/mentions', '/cgv', '/cgu',
+    '/about', '/about-us', '/a-propos', '/qui-sommes-nous',
+    '/footer', '/infos', '/informations'
+]
+
+# Concurrent requests for email extraction
+MAX_CONCURRENT_REQUESTS = 20
+REQUEST_TIMEOUT = 8
 
 
 def emit(event_type: str, data: dict):
@@ -123,6 +141,179 @@ class Business:
         if not re.search(r'[a-zA-ZàâäéèêëïîôùûüÿœæÀÂÄÉÈÊËÏÎÔÙÛÜŸŒÆ]', self.name):
             return False
         return True
+
+
+class EmailExtractor:
+    """Extracteur d'emails optimise avec requetes paralleles"""
+    
+    def __init__(self):
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+        self.email_pattern = re.compile(
+            r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',
+            re.IGNORECASE
+        )
+        self.mailto_pattern = re.compile(
+            r'mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+            re.IGNORECASE
+        )
+    
+    async def __aenter__(self):
+        timeout = ClientTimeout(total=REQUEST_TIMEOUT)
+        self.session = aiohttp.ClientSession(
+            timeout=timeout,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+            }
+        )
+        return self
+    
+    async def __aexit__(self, *args):
+        if self.session:
+            await self.session.close()
+    
+    def _is_valid_email(self, email: str) -> bool:
+        """Verifie si l'email est valide et pas dans la blacklist"""
+        email_lower = email.lower()
+        if len(email) < 6 or len(email) > 100:
+            return False
+        if any(x in email_lower for x in EMAIL_BLACKLIST):
+            return False
+        # Verifier le domaine
+        parts = email.split('@')
+        if len(parts) != 2:
+            return False
+        domain = parts[1].lower()
+        if domain.count('.') < 1:
+            return False
+        # Exclure les extensions de fichiers
+        if any(domain.endswith(x) for x in ['.png', '.jpg', '.gif', '.js', '.css']):
+            return False
+        return True
+    
+    def _extract_emails_from_html(self, html: str) -> Set[str]:
+        """Extrait tous les emails valides d'un HTML"""
+        emails = set()
+        
+        # Mailto links (priorite haute)
+        for match in self.mailto_pattern.finditer(html):
+            email = match.group(1).strip()
+            if self._is_valid_email(email):
+                emails.add(email.lower())
+        
+        # Tous les patterns email dans le HTML
+        for match in self.email_pattern.finditer(html):
+            email = match.group(0).strip()
+            if self._is_valid_email(email):
+                emails.add(email.lower())
+        
+        return emails
+    
+    async def _fetch_page(self, url: str) -> Optional[str]:
+        """Fetch une page avec timeout et gestion d'erreurs"""
+        async with self.semaphore:
+            try:
+                async with self.session.get(url, allow_redirects=True, ssl=False) as response:
+                    if response.status == 200:
+                        content_type = response.headers.get('content-type', '')
+                        if 'text/html' in content_type or 'text/plain' in content_type:
+                            return await response.text(errors='ignore')
+            except Exception:
+                pass
+            return None
+    
+    async def extract_emails_from_website(self, website: str) -> Set[str]:
+        """Extrait les emails d'un site web en visitant plusieurs pages"""
+        emails = set()
+        
+        # Normaliser l'URL
+        if not website.startswith('http'):
+            website = 'https://' + website
+        
+        parsed = urlparse(website)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        
+        # Creer les URLs a visiter
+        urls_to_visit = []
+        for page in EMAIL_PAGES:
+            url = urljoin(base_url, page)
+            if url not in urls_to_visit:
+                urls_to_visit.append(url)
+        
+        # Fetch toutes les pages en parallele
+        tasks = [self._fetch_page(url) for url in urls_to_visit[:8]]  # Max 8 pages par site
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Extraire les emails de chaque page
+        for result in results:
+            if isinstance(result, str) and result:
+                page_emails = self._extract_emails_from_html(result)
+                emails.update(page_emails)
+        
+        return emails
+    
+    async def extract_emails_batch(self, businesses: List[Business], on_progress=None) -> Dict[str, str]:
+        """Extrait les emails pour un batch d'entreprises avec sites web"""
+        results = {}
+        
+        # Filtrer les entreprises avec site web et sans email
+        to_process = [(b.place_id or b.name, b.website) for b in businesses 
+                      if b.website and not b.email]
+        
+        if not to_process:
+            return results
+        
+        total = len(to_process)
+        processed = 0
+        
+        # Traiter par batches de 50 pour le feedback
+        batch_size = 50
+        for i in range(0, total, batch_size):
+            batch = to_process[i:i+batch_size]
+            tasks = []
+            
+            for biz_id, website in batch:
+                tasks.append(self._process_single(biz_id, website))
+            
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for (biz_id, _), result in zip(batch, batch_results):
+                if isinstance(result, str) and result:
+                    results[biz_id] = result
+            
+            processed += len(batch)
+            if on_progress:
+                on_progress(processed, total, len(results))
+        
+        return results
+    
+    async def _process_single(self, biz_id: str, website: str) -> Optional[str]:
+        """Traite un seul site web et retourne le meilleur email trouve"""
+        try:
+            emails = await self.extract_emails_from_website(website)
+            if emails:
+                # Privilegier les emails avec le domaine du site
+                parsed = urlparse(website)
+                domain = parsed.netloc.replace('www.', '')
+                
+                # Chercher un email avec le meme domaine
+                for email in emails:
+                    if domain in email:
+                        return email
+                
+                # Sinon prendre le premier email "professionnel"
+                for email in emails:
+                    local = email.split('@')[0]
+                    if any(x in local for x in ['contact', 'info', 'hello', 'bonjour', 'accueil']):
+                        return email
+                
+                # Sinon prendre n'importe lequel
+                return list(emails)[0]
+        except Exception:
+            pass
+        return None
 
 
 class GMBScraperAPI:
@@ -431,7 +622,6 @@ class GMBScraperAPI:
 
                     # Si pas de phone dans le DOM, chercher dans l'API
                     if not biz.phone and api_phones:
-                        # Heuristique: prendre un telephone qui n'est pas deja utilise
                         for phone in api_phones:
                             used = any(b.phone == phone for b in self.businesses.values())
                             if not used:
@@ -460,7 +650,6 @@ class GMBScraperAPI:
 
                     # Email depuis l'API (dans les publications GMB)
                     if api_emails and not biz.email:
-                        # Chercher un email qui correspond potentiellement au nom
                         name_words = set(biz.name.lower().split())
                         for email in api_emails:
                             email_parts = email.lower().split('@')
@@ -481,7 +670,6 @@ class GMBScraperAPI:
 
                     if self._add_business(biz):
                         new_count += 1
-                        # Emettre chaque nouveau business pour le streaming (champs a plat pour n8n)
                         emit("business", biz.to_dict())
 
                 except:
@@ -567,11 +755,11 @@ class GMBScraperAPI:
             "city": city,
             "grid_size": grid_size,
             "total_zones": grid_size * grid_size * len(ZOOM_LEVELS),
-            "version": "v13-api"
+            "version": "v14-email"
         })
 
         try:
-            emit("status", {"message": "Initialisation du navigateur avec interception API..."})
+            emit("status", {"message": "Initialisation du navigateur..."})
             await self._init_browser()
 
             search_points = self._generate_grid(city, grid_size)
@@ -593,36 +781,69 @@ class GMBScraperAPI:
                         "zoom": zoom,
                         "new_businesses": zone_new,
                         "total_businesses": len(self.businesses),
-                        "percent": round(100 * search_num / total, 1),
-                        "api_emails_found": len(set(self.api_data_cache.get('emails', [])))
+                        "percent": round(100 * search_num / total, 1)
                     })
 
                 emit("zoom_complete", {"zoom": zoom, "new_businesses": zoom_new})
 
-            # Phase 2: Enrichissement des fiches incompletes
+            # Phase 2: Enrichissement GMB (SANS LIMITE)
             incomplete = [
                 (k, b) for k, b in self.businesses.items()
                 if not b.phone or not b.website
             ]
 
-            if incomplete and len(incomplete) <= 50:
-                emit("status", {"message": f"Enrichissement de {len(incomplete)} fiches incompletes..."})
+            if incomplete:
+                emit("status", {"message": f"Enrichissement de {len(incomplete)} fiches GMB..."})
 
                 for i, (key, biz) in enumerate(incomplete):
                     try:
                         if biz.google_maps_url:
-                            await self.page.goto(biz.google_maps_url, wait_until="domcontentloaded", timeout=15000)
-                            await asyncio.sleep(1.2)
+                            await self.page.goto(biz.google_maps_url, wait_until="domcontentloaded", timeout=10000)
+                            await asyncio.sleep(0.8)
                             self.businesses[key] = await self._extract_detail_from_page(biz)
 
-                            # Emettre la mise a jour (champs a plat pour n8n)
-                            emit("business_updated", {
-                                **self.businesses[key].to_dict(),
-                                "enriched": i + 1,
-                                "total_to_enrich": len(incomplete)
-                            })
+                            if (i + 1) % 20 == 0:
+                                emit("enrichment_progress", {
+                                    "enriched": i + 1,
+                                    "total": len(incomplete)
+                                })
                     except:
                         continue
+
+            # Phase 3: Extraction d'emails depuis les sites web (NOUVELLE PHASE)
+            businesses_with_website = [b for b in self.businesses.values() if b.website and not b.email]
+            
+            if businesses_with_website:
+                emit("status", {"message": f"Extraction d'emails depuis {len(businesses_with_website)} sites web..."})
+                
+                async with EmailExtractor() as extractor:
+                    def on_email_progress(processed, total, found):
+                        emit("email_extraction_progress", {
+                            "processed": processed,
+                            "total": total,
+                            "emails_found": found
+                        })
+                    
+                    email_results = await extractor.extract_emails_batch(
+                        list(self.businesses.values()),
+                        on_progress=on_email_progress
+                    )
+                    
+                    # Mettre a jour les businesses avec les emails trouves
+                    for key, biz in self.businesses.items():
+                        biz_id = biz.place_id or biz.name
+                        if biz_id in email_results:
+                            biz.email = email_results[biz_id]
+                            emit("business_updated", {
+                                **biz.to_dict(),
+                                "email_source": "website"
+                            })
+                
+                emit("email_extraction_complete", {"emails_found": len(email_results)})
+
+            # Fermer le navigateur
+            if self.browser:
+                await self.browser.close()
 
             elapsed = (datetime.now() - self.start_time).total_seconds()
             businesses_list = list(self.businesses.values())
