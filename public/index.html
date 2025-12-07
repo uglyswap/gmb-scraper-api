@@ -3,49 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GMB Scraper</title>
+  <title>GMB Scraper Pro v15</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
       min-height: 100vh;
       color: #fff;
       padding: 20px;
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
     }
 
     h1 {
       text-align: center;
-      margin-bottom: 30px;
+      margin-bottom: 10px;
       font-size: 2.5rem;
-      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      background: linear-gradient(90deg, #00d4ff, #7b2cbf, #ff6b6b);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .version {
+      text-align: center;
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 30px;
     }
 
     .form-card {
-      background: rgba(255,255,255,0.05);
-      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 20px;
       padding: 30px;
-      margin-bottom: 30px;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 25px;
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     }
 
     .form-row {
       display: grid;
-      grid-template-columns: 1fr 1fr 120px 150px;
-      gap: 15px;
+      grid-template-columns: 1fr 1fr 150px 160px;
+      gap: 20px;
       align-items: end;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
+      .form-row { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 600px) {
       .form-row { grid-template-columns: 1fr; }
     }
 
@@ -53,75 +66,109 @@
       display: block;
       margin-bottom: 8px;
       font-weight: 500;
-      color: #a0a0a0;
+      color: #888;
+      font-size: 0.9rem;
     }
 
     .form-group input, .form-group select {
       width: 100%;
-      padding: 12px 16px;
-      border: 2px solid rgba(255,255,255,0.1);
-      border-radius: 10px;
-      background: rgba(0,0,0,0.3);
+      padding: 14px 18px;
+      border: 2px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      background: rgba(0,0,0,0.4);
       color: #fff;
-      font-size: 16px;
-      transition: border-color 0.3s;
+      font-size: 15px;
+      transition: all 0.3s;
     }
 
     .form-group input:focus, .form-group select:focus {
       outline: none;
       border-color: #00d4ff;
+      box-shadow: 0 0 20px rgba(0,212,255,0.2);
+    }
+
+    .form-group input::placeholder {
+      color: #555;
     }
 
     .btn {
-      padding: 12px 24px;
+      padding: 14px 28px;
       border: none;
-      border-radius: 10px;
-      font-size: 16px;
+      border-radius: 12px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .btn-primary {
-      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      background: linear-gradient(135deg, #00d4ff, #0099cc);
       color: #fff;
+      box-shadow: 0 4px 15px rgba(0,212,255,0.3);
     }
 
     .btn-primary:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(0,212,255,0.3);
+      box-shadow: 0 8px 25px rgba(0,212,255,0.4);
     }
 
     .btn-primary:disabled {
-      opacity: 0.5;
+      opacity: 0.4;
       cursor: not-allowed;
+      transform: none;
     }
 
     .btn-success {
-      background: linear-gradient(90deg, #00c853, #00e676);
+      background: linear-gradient(135deg, #00c853, #00e676);
       color: #fff;
-    }
-
-    .btn-success:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(0,200,83,0.3);
+      box-shadow: 0 4px 15px rgba(0,200,83,0.3);
     }
 
     .btn-danger {
-      background: linear-gradient(90deg, #ff5252, #ff1744);
+      background: linear-gradient(135deg, #ff5252, #ff1744);
       color: #fff;
+      padding: 10px 20px;
+      font-size: 13px;
     }
 
     .progress-card {
-      background: rgba(255,255,255,0.05);
-      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 20px;
       padding: 25px;
-      margin-bottom: 30px;
-      border: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 25px;
+      border: 1px solid rgba(255,255,255,0.08);
       display: none;
     }
 
     .progress-card.active { display: block; }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .progress-header h3 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0,212,255,0.3);
+      border-top-color: #00d4ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
 
     .phase-indicator {
       display: flex;
@@ -129,99 +176,153 @@
       margin-bottom: 20px;
     }
 
-    .phase-badge {
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
-      background: rgba(255,255,255,0.1);
+    .phase {
+      flex: 1;
+      padding: 12px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      text-align: center;
+      font-size: 0.85rem;
       color: #666;
+      border: 2px solid transparent;
       transition: all 0.3s;
     }
 
-    .phase-badge.active {
-      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
-      color: #fff;
-      box-shadow: 0 4px 15px rgba(0,212,255,0.3);
+    .phase.active {
+      border-color: #00d4ff;
+      color: #00d4ff;
+      background: rgba(0,212,255,0.1);
     }
 
-    .phase-badge.completed {
-      background: linear-gradient(90deg, #00c853, #00e676);
-      color: #fff;
+    .phase.done {
+      border-color: #00c853;
+      color: #00c853;
+      background: rgba(0,200,83,0.1);
     }
 
     .progress-bar-container {
-      background: rgba(0,0,0,0.3);
-      border-radius: 10px;
-      height: 20px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 12px;
+      height: 24px;
       overflow: hidden;
       margin: 15px 0;
+      position: relative;
     }
 
     .progress-bar {
       height: 100%;
       background: linear-gradient(90deg, #00d4ff, #7b2cbf);
-      border-radius: 10px;
+      border-radius: 12px;
       transition: width 0.3s;
       width: 0%;
+      position: relative;
     }
 
-    .progress-bar.email-phase {
-      background: linear-gradient(90deg, #ff9800, #ff5722);
+    .progress-bar::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .progress-text {
+      color: #888;
+      font-size: 0.95rem;
+      text-align: center;
     }
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      grid-template-columns: repeat(5, 1fr);
       gap: 15px;
-      margin-top: 20px;
+      margin: 25px 0;
+    }
+
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); }
     }
 
     .stat-item {
-      background: rgba(0,0,0,0.2);
-      padding: 15px;
-      border-radius: 10px;
+      background: rgba(0,0,0,0.3);
+      padding: 20px 15px;
+      border-radius: 14px;
       text-align: center;
-      transition: transform 0.3s;
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: all 0.3s;
     }
 
-    .stat-item.highlight {
+    .stat-item:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      transition: all 0.3s;
+    }
+
+    .stat-value.total { color: #00d4ff; }
+    .stat-value.phone { color: #00e676; }
+    .stat-value.email { color: #ff9800; }
+    .stat-value.website { color: #9c27b0; }
+    .stat-value.address { color: #03a9f4; }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-item.highlight .stat-value {
       animation: pulse 0.5s ease;
     }
 
     @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-      100% { transform: scale(1); }
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
     }
 
-    .stat-value {
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: #00d4ff;
+    .log-container {
+      background: rgba(0,0,0,0.4);
+      border-radius: 12px;
+      padding: 15px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.05);
     }
 
-    .stat-value.phone { color: #4caf50; }
-    .stat-value.email { color: #ff9800; }
-    .stat-value.website { color: #9c27b0; }
-
-    .stat-label {
-      font-size: 0.8rem;
-      color: #a0a0a0;
-      margin-top: 5px;
+    .log-entry {
+      padding: 4px 0;
+      color: #666;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
     }
 
-    .stat-change {
-      font-size: 0.75rem;
-      color: #00e676;
-      margin-top: 3px;
-    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-entry.success { color: #00e676; }
+    .log-entry.error { color: #ff5252; }
+    .log-entry.info { color: #00d4ff; }
+    .log-entry.email { color: #ff9800; }
+    .log-entry.phone { color: #00e676; }
 
     .results-card {
-      background: rgba(255,255,255,0.05);
-      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 20px;
       padding: 25px;
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.08);
       display: none;
     }
 
@@ -236,153 +337,120 @@
       gap: 15px;
     }
 
+    .results-header h3 {
+      font-size: 1.3rem;
+    }
+
+    .results-header h3 span {
+      color: #00d4ff;
+    }
+
     .results-table-container {
       overflow-x: auto;
       max-height: 500px;
       overflow-y: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.05);
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 14px;
-    }
-
-    th, td {
-      padding: 12px 15px;
-      text-align: left;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      white-space: nowrap;
-    }
-
-    th {
-      background: rgba(0,212,255,0.2);
-      position: sticky;
-      top: 0;
-      font-weight: 600;
-    }
-
-    tr:hover td {
-      background: rgba(255,255,255,0.05);
-    }
-
-    tr.new-email td {
-      animation: newEmail 1s ease;
-    }
-
-    @keyframes newEmail {
-      0% { background: rgba(255,152,0,0.3); }
-      100% { background: transparent; }
-    }
-
-    .log-container {
-      background: rgba(0,0,0,0.3);
-      border-radius: 10px;
-      padding: 15px;
-      margin-top: 20px;
-      max-height: 200px;
-      overflow-y: auto;
-      font-family: monospace;
       font-size: 13px;
     }
 
-    .log-entry {
-      padding: 3px 0;
-      color: #a0a0a0;
+    th, td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
     }
 
-    .log-entry.success { color: #00e676; }
-    .log-entry.error { color: #ff5252; }
-    .log-entry.info { color: #00d4ff; }
-    .log-entry.email { color: #ff9800; }
+    th {
+      background: rgba(0,212,255,0.15);
+      position: sticky;
+      top: 0;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      color: #00d4ff;
+    }
 
-    .hidden { display: none !important; }
+    tr:hover td {
+      background: rgba(255,255,255,0.03);
+    }
+
+    td a {
+      color: #00d4ff;
+      text-decoration: none;
+    }
+
+    td a:hover {
+      text-decoration: underline;
+    }
+
+    .has-data {
+      color: #00e676;
+    }
+
+    .no-data {
+      color: #444;
+    }
+
+    .api-key-section {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
 
     .api-key-input {
-      background: rgba(0,0,0,0.3);
-      border: 2px solid rgba(255,255,255,0.1);
+      flex: 1;
+      max-width: 350px;
+      background: rgba(0,0,0,0.4);
+      border: 2px solid rgba(255,255,255,0.08);
       border-radius: 10px;
-      padding: 10px 15px;
+      padding: 12px 15px;
       color: #fff;
       font-family: monospace;
-      width: 300px;
-      margin-bottom: 20px;
+      font-size: 14px;
     }
 
     .api-key-input:focus {
       outline: none;
       border-color: #00d4ff;
     }
-
-    .email-extraction-info {
-      background: rgba(255,152,0,0.1);
-      border: 1px solid rgba(255,152,0,0.3);
-      border-radius: 10px;
-      padding: 15px;
-      margin-top: 15px;
-      display: none;
-    }
-
-    .email-extraction-info.active {
-      display: block;
-    }
-
-    .email-extraction-info h4 {
-      color: #ff9800;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .email-extraction-info .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255,152,0,0.3);
-      border-top-color: #ff9800;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .email-progress {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      color: #a0a0a0;
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>GMB Scraper</h1>
+    <h1>GMB Scraper Pro</h1>
+    <p class="version">v15 - Extraction complete avec details et emails</p>
 
     <div class="form-card">
-      <div style="margin-bottom: 15px;">
-        <label style="color: #a0a0a0; margin-right: 10px;">API Key:</label>
-        <input type="password" id="apiKey" class="api-key-input" placeholder="Entrez votre API key" value="">
+      <div class="api-key-section">
+        <label style="color: #888; white-space: nowrap;">API Key:</label>
+        <input type="password" id="apiKey" class="api-key-input" placeholder="Votre cle API">
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label>Activite</label>
-          <input type="text" id="activity" placeholder="Ex: restaurant, coiffeur, agence immobiliere">
+          <input type="text" id="activity" placeholder="restaurant, coiffeur, agence immobiliere...">
         </div>
         <div class="form-group">
           <label>Ville</label>
-          <input type="text" id="city" placeholder="Ex: paris, lyon, marseille">
+          <input type="text" id="city" placeholder="paris, lyon, marseille...">
         </div>
         <div class="form-group">
-          <label>Grille</label>
+          <label>Zones</label>
           <select id="gridSize">
-            <option value="2">2x2 (rapide)</option>
-            <option value="3" selected>3x3</option>
-            <option value="4">4x4</option>
-            <option value="5">5x5</option>
-            <option value="6">6x6 (complet)</option>
+            <option value="2">Minimal (9)</option>
+            <option value="3" selected>Standard (16)</option>
+            <option value="4">Complet (20)</option>
+            <option value="5">Maximum (20)</option>
           </select>
         </div>
         <div class="form-group">
@@ -392,53 +460,42 @@
     </div>
 
     <div id="progressCard" class="progress-card">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3 id="progressTitle">Scraping en cours...</h3>
+      <div class="progress-header">
+        <h3><div class="spinner"></div> Scraping en cours...</h3>
         <button class="btn btn-danger" onclick="stopScraping()">Arreter</button>
       </div>
 
       <div class="phase-indicator">
-        <span id="phase1" class="phase-badge active">1. Scan GMB</span>
-        <span id="phase2" class="phase-badge">2. Enrichissement</span>
-        <span id="phase3" class="phase-badge">3. Extraction Emails</span>
+        <div id="phase1" class="phase active">1. Scan GMB</div>
+        <div id="phase2" class="phase">2. Extraction details</div>
+        <div id="phase3" class="phase">3. Emails sites web</div>
       </div>
 
       <div class="progress-bar-container">
         <div id="progressBar" class="progress-bar"></div>
       </div>
-      <p id="progressText" style="color: #a0a0a0;">Initialisation...</p>
+      <p id="progressText" class="progress-text">Initialisation...</p>
 
       <div class="stats-grid">
         <div class="stat-item">
-          <div id="statTotal" class="stat-value">0</div>
-          <div class="stat-label">Total trouve</div>
+          <div id="statTotal" class="stat-value total">0</div>
+          <div class="stat-label">Total</div>
         </div>
         <div class="stat-item">
           <div id="statPhone" class="stat-value phone">0</div>
           <div class="stat-label">Telephones</div>
-          <div id="phoneChange" class="stat-change"></div>
         </div>
         <div class="stat-item">
           <div id="statEmail" class="stat-value email">0</div>
           <div class="stat-label">Emails</div>
-          <div id="emailChange" class="stat-change"></div>
         </div>
         <div class="stat-item">
           <div id="statWebsite" class="stat-value website">0</div>
           <div class="stat-label">Sites web</div>
         </div>
         <div class="stat-item">
-          <div id="statEmailExtracted" class="stat-value email">0</div>
-          <div class="stat-label">Emails extraits</div>
-          <div id="emailExtractedChange" class="stat-change"></div>
-        </div>
-      </div>
-
-      <div id="emailExtractionInfo" class="email-extraction-info">
-        <h4><span class="spinner"></span> Extraction emails depuis les sites web</h4>
-        <div class="email-progress">
-          <span id="emailProgressText">Analyse des sites web...</span>
-          <span id="emailProgressCount">0 / 0</span>
+          <div id="statAddress" class="stat-value address">0</div>
+          <div class="stat-label">Adresses</div>
         </div>
       </div>
 
@@ -448,9 +505,7 @@
     <div id="resultsCard" class="results-card">
       <div class="results-header">
         <h3><span id="resultsCount">0</span> resultats</h3>
-        <div>
-          <button class="btn btn-success" onclick="downloadCSV()">Telecharger CSV</button>
-        </div>
+        <button class="btn btn-success" onclick="downloadCSV()">Telecharger CSV</button>
       </div>
 
       <div class="results-table-container">
@@ -460,11 +515,10 @@
               <th>Nom</th>
               <th>Telephone</th>
               <th>Email</th>
-              <th>Adresse</th>
               <th>Site Web</th>
+              <th>Adresse</th>
               <th>Note</th>
               <th>Avis</th>
-              <th>Categorie</th>
             </tr>
           </thead>
           <tbody id="resultsBody"></tbody>
@@ -476,56 +530,41 @@
   <script>
     let eventSource = null;
     let businesses = [];
-    let businessMap = new Map(); // For quick lookup by place_id
-    let currentStats = { with_phone: 0, with_email: 0, with_website: 0, emails_extracted: 0 };
-    let currentPhase = 1;
-    let emailExtractionTotal = 0;
-    let emailExtractionDone = 0;
+    let businessMap = {};
+    let stats = { total: 0, with_phone: 0, with_email: 0, with_website: 0, with_address: 0 };
 
     function log(message, type = '') {
       const container = document.getElementById('logContainer');
       const entry = document.createElement('div');
       entry.className = 'log-entry ' + type;
-      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      entry.textContent = `[${time}] ${message}`;
       container.appendChild(entry);
       container.scrollTop = container.scrollHeight;
+
+      // Keep only last 50 entries
+      while (container.children.length > 50) {
+        container.removeChild(container.firstChild);
+      }
+    }
+
+    function updateStat(id, value, highlight = true) {
+      const el = document.getElementById(id);
+      const oldValue = parseInt(el.textContent);
+      el.textContent = value;
+
+      if (highlight && value > oldValue) {
+        el.parentElement.classList.add('highlight');
+        setTimeout(() => el.parentElement.classList.remove('highlight'), 500);
+      }
     }
 
     function setPhase(phase) {
-      currentPhase = phase;
-      for (let i = 1; i <= 3; i++) {
-        const el = document.getElementById('phase' + i);
-        el.classList.remove('active', 'completed');
-        if (i < phase) el.classList.add('completed');
-        if (i === phase) el.classList.add('active');
-      }
-
-      const progressBar = document.getElementById('progressBar');
-      if (phase === 3) {
-        progressBar.classList.add('email-phase');
-        document.getElementById('emailExtractionInfo').classList.add('active');
-        document.getElementById('progressTitle').textContent = 'Extraction emails...';
-      } else {
-        progressBar.classList.remove('email-phase');
-        document.getElementById('emailExtractionInfo').classList.remove('active');
-      }
-    }
-
-    function updateStat(id, value, changeId = null) {
-      const el = document.getElementById(id);
-      const oldValue = parseInt(el.textContent) || 0;
-      el.textContent = value;
-
-      if (value > oldValue) {
-        el.parentElement.classList.add('highlight');
-        setTimeout(() => el.parentElement.classList.remove('highlight'), 500);
-
-        if (changeId) {
-          const changeEl = document.getElementById(changeId);
-          changeEl.textContent = '+' + (value - oldValue);
-          setTimeout(() => changeEl.textContent = '', 2000);
-        }
-      }
+      document.querySelectorAll('.phase').forEach((el, idx) => {
+        el.classList.remove('active', 'done');
+        if (idx + 1 < phase) el.classList.add('done');
+        else if (idx + 1 === phase) el.classList.add('active');
+      });
     }
 
     function startScraping() {
@@ -546,28 +585,24 @@
 
       // Reset
       businesses = [];
-      businessMap = new Map();
-      currentStats = { with_phone: 0, with_email: 0, with_website: 0, emails_extracted: 0 };
-      emailExtractionTotal = 0;
-      emailExtractionDone = 0;
+      businessMap = {};
+      stats = { total: 0, with_phone: 0, with_email: 0, with_website: 0, with_address: 0 };
       document.getElementById('resultsBody').innerHTML = '';
       document.getElementById('logContainer').innerHTML = '';
       document.getElementById('progressBar').style.width = '0%';
-      document.getElementById('progressBar').classList.remove('email-phase');
-      updateStat('statTotal', 0);
-      updateStat('statPhone', 0);
-      updateStat('statEmail', 0);
-      updateStat('statWebsite', 0);
-      updateStat('statEmailExtracted', 0);
+      updateStat('statTotal', 0, false);
+      updateStat('statPhone', 0, false);
+      updateStat('statEmail', 0, false);
+      updateStat('statWebsite', 0, false);
+      updateStat('statAddress', 0, false);
       setPhase(1);
 
       // Show progress
       document.getElementById('progressCard').classList.add('active');
       document.getElementById('resultsCard').classList.remove('active');
       document.getElementById('startBtn').disabled = true;
-      document.getElementById('progressTitle').textContent = 'Scraping en cours...';
 
-      log(`Demarrage: ${activity} a ${city} (grille ${gridSize}x${gridSize})`, 'info');
+      log(`Demarrage: "${activity}" a ${city}`, 'info');
 
       // Build URL
       const baseUrl = window.location.origin;
@@ -575,120 +610,134 @@
 
       eventSource = new EventSource(url);
 
+      // === START ===
       eventSource.addEventListener('start', (e) => {
         const data = JSON.parse(e.data);
-        log(`Recherche lancee: ${data.total_zones} zones a scanner`, 'info');
-        setPhase(1);
+        log(`${data.total_zones} zones a scanner (${data.version})`, 'info');
       });
 
-      eventSource.addEventListener('progress', (e) => {
+      // === ZONE EVENTS ===
+      eventSource.addEventListener('zone_start', (e) => {
+        const data = JSON.parse(e.data);
+        log(`Zone ${data.zone}/${data.total_zones} (${data.lat}, ${data.lng})`, 'info');
+      });
+
+      eventSource.addEventListener('zone_links', (e) => {
+        const data = JSON.parse(e.data);
+        if (data.unique_new > 0) {
+          log(`Zone ${data.zone}: ${data.unique_new} nouvelles fiches a extraire`, 'info');
+        }
+      });
+
+      eventSource.addEventListener('zone_complete', (e) => {
         const data = JSON.parse(e.data);
         const percent = data.percent || Math.round((data.zone / data.total_zones) * 100);
         document.getElementById('progressBar').style.width = percent + '%';
         document.getElementById('progressText').textContent =
-          `Zone ${data.zone}/${data.total_zones} - ${data.total_businesses} entreprises trouvees`;
-        updateStat('statTotal', data.total_businesses);
+          `Zone ${data.zone}/${data.total_zones} - ${data.total_businesses} entreprises`;
       });
 
-      eventSource.addEventListener('enrichment_start', (e) => {
-        log('Phase 2: Enrichissement des fiches GMB...', 'info');
-        setPhase(2);
+      // === BUSINESS ===
+      eventSource.addEventListener('business', (e) => {
+        const biz = JSON.parse(e.data);
+        if (!biz || !biz.name) return;
+
+        const key = biz.place_id || biz.name;
+        businessMap[key] = biz;
+        businesses.push(biz);
+
+        // Update stats from business data
+        stats.total = businesses.length;
+        if (biz.phone) stats.with_phone++;
+        if (biz.email) stats.with_email++;
+        if (biz.website) stats.with_website++;
+        if (biz.address) stats.with_address++;
+
+        updateStat('statTotal', stats.total);
+        updateStat('statPhone', stats.with_phone);
+        updateStat('statEmail', stats.with_email);
+        updateStat('statWebsite', stats.with_website);
+        updateStat('statAddress', stats.with_address);
+
+        // Add to table
+        addToTable(biz, key);
+
+        // Log important data
+        if (biz.phone) {
+          log(`${biz.name}: ${biz.phone}`, 'phone');
+        }
       });
 
-      eventSource.addEventListener('enrichment_progress', (e) => {
+      // === STATS UPDATE ===
+      eventSource.addEventListener('stats_update', (e) => {
         const data = JSON.parse(e.data);
-        const percent = Math.round((data.current / data.total) * 100);
-        document.getElementById('progressBar').style.width = percent + '%';
-        document.getElementById('progressText').textContent =
-          `Enrichissement: ${data.current}/${data.total} fiches`;
+        updateStat('statTotal', data.total);
+        updateStat('statPhone', data.with_phone);
+        updateStat('statEmail', data.with_email);
+        updateStat('statWebsite', data.with_website);
+        updateStat('statAddress', data.with_address);
+      });
+
+      // === EMAIL EXTRACTION ===
+      eventSource.addEventListener('status', (e) => {
+        const data = JSON.parse(e.data);
+        log(data.message, 'info');
+        if (data.message.includes('Phase 2') || data.message.includes('emails')) {
+          setPhase(3);
+        }
       });
 
       eventSource.addEventListener('email_extraction_start', (e) => {
         const data = JSON.parse(e.data);
-        log(`Phase 3: Extraction emails depuis ${data.total_sites} sites web...`, 'email');
         setPhase(3);
-        emailExtractionTotal = data.total_sites;
-        emailExtractionDone = 0;
-        document.getElementById('emailProgressCount').textContent = `0 / ${emailExtractionTotal}`;
-        document.getElementById('progressBar').style.width = '0%';
+        log(`Extraction emails: ${data.total_sites} sites web a scanner`, 'email');
+        document.getElementById('progressText').textContent = `Extraction emails: 0/${data.total_sites}`;
       });
 
       eventSource.addEventListener('email_extraction_progress', (e) => {
         const data = JSON.parse(e.data);
-        emailExtractionDone = data.current;
-        const percent = Math.round((data.current / data.total) * 100);
-        document.getElementById('progressBar').style.width = percent + '%';
-        document.getElementById('emailProgressCount').textContent = `${data.current} / ${data.total}`;
-        document.getElementById('emailProgressText').textContent = `${data.emails_found} emails trouves`;
         document.getElementById('progressText').textContent =
-          `Extraction emails: ${data.current}/${data.total} sites analyses`;
+          `Extraction emails: ${data.processed}/${data.total} (${data.found} trouves)`;
+        const percent = Math.round((data.processed / data.total) * 100);
+        document.getElementById('progressBar').style.width = percent + '%';
       });
 
       eventSource.addEventListener('email_found', (e) => {
         const data = JSON.parse(e.data);
-        log(`Email trouve: ${data.email} (${data.business_name})`, 'email');
-        currentStats.emails_extracted++;
-        updateStat('statEmailExtracted', currentStats.emails_extracted, 'emailExtractedChange');
+        log(`Email trouve: ${data.email}`, 'email');
+        stats.with_email = data.total_found;
+        updateStat('statEmail', stats.with_email);
 
-        // Update the business in our list
-        if (data.place_id && businessMap.has(data.place_id)) {
-          const biz = businessMap.get(data.place_id);
-          if (!biz.email || biz.email === 'N/A') {
-            biz.email = data.email;
-            currentStats.with_email++;
-            updateStat('statEmail', currentStats.with_email, 'emailChange');
-
-            // Update table row
-            updateTableRow(biz);
-          }
+        // Update business in map and table
+        if (data.business_key && businessMap[data.business_key]) {
+          businessMap[data.business_key].email = data.email;
+          updateTableRow(data.business_key, data.email);
         }
       });
 
-      eventSource.addEventListener('business', (e) => {
-        const data = JSON.parse(e.data);
-        // Handle both nested and flat structure
-        const biz = data.data || data;
-
-        if (biz && biz.name) {
-          businesses.push(biz);
-          if (biz.place_id) {
-            businessMap.set(biz.place_id, biz);
-          }
-
-          // Update stats
-          if (biz.phone && biz.phone !== 'N/A') currentStats.with_phone++;
-          if (biz.email && biz.email !== 'N/A') currentStats.with_email++;
-          if (biz.website && biz.website !== 'N/A') currentStats.with_website++;
-
-          updateStat('statTotal', businesses.length);
-          updateStat('statPhone', currentStats.with_phone, 'phoneChange');
-          updateStat('statEmail', currentStats.with_email, 'emailChange');
-          updateStat('statWebsite', currentStats.with_website);
-
-          // Add to table
-          addToTable(biz);
-        }
-      });
-
+      // === COMPLETE ===
       eventSource.addEventListener('complete', (e) => {
         const data = JSON.parse(e.data);
-        log(`Termine! ${businesses.length} entreprises trouvees`, 'success');
+        log(`Termine! ${data.stats.total} entreprises`, 'success');
 
+        // Update final stats
         if (data.stats) {
+          updateStat('statTotal', data.stats.total);
           updateStat('statPhone', data.stats.with_phone);
           updateStat('statEmail', data.stats.with_email);
           updateStat('statWebsite', data.stats.with_website);
+          updateStat('statAddress', data.stats.with_address);
         }
 
-        // Mark all phases as completed
-        for (let i = 1; i <= 3; i++) {
-          document.getElementById('phase' + i).classList.remove('active');
-          document.getElementById('phase' + i).classList.add('completed');
+        // Update businesses list with final data
+        if (data.businesses && data.businesses.length > 0) {
+          businesses = data.businesses;
         }
 
         finishScraping();
       });
 
+      // === ERROR ===
       eventSource.addEventListener('error', (e) => {
         if (e.data) {
           const data = JSON.parse(e.data);
@@ -700,37 +749,36 @@
         if (eventSource.readyState === EventSource.CLOSED) {
           log('Connexion fermee', 'info');
           finishScraping();
-        } else {
-          log('Erreur de connexion', 'error');
         }
       };
     }
 
-    function addToTable(biz) {
+    function addToTable(biz, key) {
       const tbody = document.getElementById('resultsBody');
       const tr = document.createElement('tr');
-      tr.id = 'row-' + (biz.place_id || businesses.length);
+      tr.id = 'row_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+
       tr.innerHTML = `
         <td>${escapeHtml(biz.name || '')}</td>
-        <td>${escapeHtml(biz.phone || biz.phone_clean || '')}</td>
-        <td class="email-cell">${escapeHtml(biz.email || '')}</td>
-        <td>${escapeHtml(biz.address || '')}</td>
-        <td>${biz.website && biz.website !== 'N/A' ? `<a href="${escapeHtml(biz.website)}" target="_blank" style="color:#00d4ff">Lien</a>` : ''}</td>
-        <td>${biz.rating || ''}</td>
-        <td>${biz.review_count || ''}</td>
-        <td>${escapeHtml(biz.category || '')}</td>
+        <td class="${biz.phone ? 'has-data' : 'no-data'}">${escapeHtml(biz.phone || '-')}</td>
+        <td class="${biz.email ? 'has-data' : 'no-data'}" data-email="true">${escapeHtml(biz.email || '-')}</td>
+        <td>${biz.website ? `<a href="${escapeHtml(biz.website)}" target="_blank">Lien</a>` : '<span class="no-data">-</span>'}</td>
+        <td>${escapeHtml((biz.address || '').substring(0, 50))}${biz.address && biz.address.length > 50 ? '...' : ''}</td>
+        <td>${biz.rating || '-'}</td>
+        <td>${biz.review_count || '-'}</td>
       `;
-      tbody.appendChild(tr);
+      tbody.insertBefore(tr, tbody.firstChild);
     }
 
-    function updateTableRow(biz) {
-      const tr = document.getElementById('row-' + biz.place_id);
-      if (tr) {
-        const emailCell = tr.querySelector('.email-cell');
+    function updateTableRow(key, email) {
+      const rowId = 'row_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+      const row = document.getElementById(rowId);
+      if (row) {
+        const emailCell = row.querySelector('td[data-email="true"]');
         if (emailCell) {
-          emailCell.textContent = biz.email || '';
-          tr.classList.add('new-email');
-          setTimeout(() => tr.classList.remove('new-email'), 1000);
+          emailCell.textContent = email;
+          emailCell.className = 'has-data';
+          emailCell.style.animation = 'pulse 0.5s ease';
         }
       }
     }
@@ -747,7 +795,7 @@
         eventSource.close();
         eventSource = null;
       }
-      log('Arrete par l\'utilisateur', 'info');
+      log('Arrete par utilisateur', 'info');
       finishScraping();
     }
 
@@ -760,8 +808,9 @@
       document.getElementById('startBtn').disabled = false;
       document.getElementById('progressBar').style.width = '100%';
       document.getElementById('resultsCount').textContent = businesses.length;
-      document.getElementById('emailExtractionInfo').classList.remove('active');
-      document.getElementById('progressTitle').textContent = 'Termine!';
+      document.getElementById('progressText').textContent = 'Termine!';
+
+      setPhase(4); // All done
 
       if (businesses.length > 0) {
         document.getElementById('resultsCard').classList.add('active');
@@ -774,16 +823,13 @@
         return;
       }
 
-      // CSV headers
       const headers = ['name', 'phone', 'phone_clean', 'email', 'address', 'website', 'rating', 'review_count', 'category', 'latitude', 'longitude', 'place_id', 'google_maps_url'];
 
-      // Build CSV
       let csv = headers.join(';') + '\n';
 
       for (const biz of businesses) {
         const row = headers.map(h => {
           let val = biz[h] || '';
-          // Escape quotes and wrap in quotes if contains separator or quotes
           if (typeof val === 'string') {
             val = val.replace(/"/g, '""');
             if (val.includes(';') || val.includes('"') || val.includes('\n')) {
@@ -795,12 +841,13 @@
         csv += row.join(';') + '\n';
       }
 
-      // Download
       const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `gmb_${document.getElementById('activity').value}_${document.getElementById('city').value}_${new Date().toISOString().slice(0,10)}.csv`;
+      const activity = document.getElementById('activity').value.replace(/\s+/g, '_');
+      const city = document.getElementById('city').value;
+      a.download = `gmb_${activity}_${city}_${new Date().toISOString().slice(0,10)}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -809,13 +856,12 @@
       log('CSV telecharge!', 'success');
     }
 
-    // Auto-fill API key if stored
+    // Auto-fill API key
     const storedKey = localStorage.getItem('gmb_api_key');
     if (storedKey) {
       document.getElementById('apiKey').value = storedKey;
     }
 
-    // Save API key on change
     document.getElementById('apiKey').addEventListener('change', (e) => {
       localStorage.setItem('gmb_api_key', e.target.value);
     });
