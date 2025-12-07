@@ -50,7 +50,8 @@ export class ScraperService {
       city,
       gridSize.toString()
     ], {
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8', LANG: 'fr_FR.UTF-8' }
     });
 
     this.isRunning = true;
