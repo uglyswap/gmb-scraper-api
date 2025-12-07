@@ -481,8 +481,8 @@ class GMBScraperAPI:
 
                     if self._add_business(biz):
                         new_count += 1
-                        # Emettre chaque nouveau business pour le streaming
-                        emit("business", {"data": biz.to_dict()})
+                        # Emettre chaque nouveau business pour le streaming (champs a plat pour n8n)
+                        emit("business", biz.to_dict())
 
                 except:
                     continue
@@ -615,9 +615,9 @@ class GMBScraperAPI:
                             await asyncio.sleep(1.2)
                             self.businesses[key] = await self._extract_detail_from_page(biz)
 
-                            # Emettre la mise a jour
+                            # Emettre la mise a jour (champs a plat pour n8n)
                             emit("business_updated", {
-                                "data": self.businesses[key].to_dict(),
+                                **self.businesses[key].to_dict(),
                                 "enriched": i + 1,
                                 "total_to_enrich": len(incomplete)
                             })
