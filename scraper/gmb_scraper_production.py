@@ -59,12 +59,11 @@ CITY_COORDS = {
 # Email patterns to exclude - COMPREHENSIVE LIST
 INVALID_EMAIL_PATTERNS = [
     # Placeholder/example emails (EN + FR)
-    'example', 'exemple', 'sample', 'demo', 'fake', 'test',
+    'example', 'exemple', 'sample', 'demo', 'fake', 'test@',
     'your-email', 'votre-email', 'votre-mail', 'your-mail',
     'yourname', 'votrenom', 'votremail', 'youremail',
-    'nom@', 'prenom@', 'name@', 'firstname@', 'lastname@',
     'email@email', 'mail@mail', 'user@user',
-    'xxx@', 'abc@', 'aaa@', 'zzz@', 'info@example', 'contact@example',
+    'xxx@', 'aaa@', 'zzz@', 'info@example', 'contact@example',
     '@exemple.', '@example.', '@test.', '@demo.', '@fake.',
     '@domain.', '@yourdomain', '@votredomaine', '@mondomaine',
     'placeholder', 'changeme', 'replace',
@@ -90,13 +89,13 @@ INVALID_EMAIL_PATTERNS = [
     # System/automated emails
     'noreply', 'no-reply', 'donotreply', 'do-not-reply',
     'mailer-daemon', 'postmaster', 'webmaster', 'hostmaster',
-    'abuse', 'spam', 'bounce', 'return', 'unsubscribe',
-    'newsletter', 'notification', 'alert', 'system', 'auto',
-    'robot', 'bot@', 'daemon', 'root@', 'admin@localhost',
+    'abuse@', 'spam@', 'bounce', 'return@', 'unsubscribe',
+    'newsletter@', 'notification@', 'alert@', 'system@', 'auto@',
+    'robot@', 'bot@', 'daemon', 'root@localhost', 'admin@localhost',
     
     # Invalid TLDs / patterns
     '@sentry.', '@wix.', '@google.', '@facebook.',
-    '.local', '.localhost', '.internal', '.invalid', '.test',
+    '.local', '.localhost', '.internal', '.invalid',
     '@127.', '@192.168.', '@10.0.',
 ]
 
@@ -105,7 +104,7 @@ INVALID_DOMAINS = [
     'example.com', 'exemple.com', 'example.fr', 'exemple.fr',
     'test.com', 'test.fr', 'demo.com', 'fake.com',
     'domain.com', 'domain.fr', 'yourdomain.com', 'votredomaine.fr',
-    'email.com', 'mail.com', 'website.com', 'site.com',
+    'email.com', 'website.com', 'site.com',
     'company.com', 'entreprise.fr', 'societe.fr',
     'sentry.io', 'wix.com', 'squarespace.com',
 ]
@@ -121,7 +120,7 @@ def is_valid_email(email: str) -> bool:
     email_lower = email.lower().strip()
     
     # Basic format check
-    if len(email_lower) < 6 or len(email_lower) > 254:
+    if len(email_lower) < 5 or len(email_lower) > 254:
         return False
     if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email_lower):
         return False
@@ -136,25 +135,7 @@ def is_valid_email(email: str) -> bool:
         domain = email_lower.split('@')[1]
         if domain in INVALID_DOMAINS:
             return False
-        # Reject very short domains (likely fake)
-        if len(domain) < 4:
-            return False
-        # Reject domains that look like placeholders
-        if re.match(r'^[a-z]\.[a-z]{2,3}$', domain):  # a.com, b.fr, etc.
-            return False
     except:
-        return False
-    
-    # Check local part (before @)
-    local_part = email_lower.split('@')[0]
-    # Reject very short local parts
-    if len(local_part) < 2:
-        return False
-    # Reject numeric-only local parts
-    if local_part.isdigit():
-        return False
-    # Reject obvious placeholders
-    if re.match(r'^(x+|a+|z+|test|user|mail|email|info|contact)$', local_part):
         return False
     
     return True
@@ -330,11 +311,14 @@ class GMBScraperProduction:
 
                 async with self._zone_lock:
                     self.zones_done += 1
+                    # Phase 1 = 0-40% of total progress
+                    phase1_percent = int((self.zones_done / self.total_zones) * 40)
                     emit("zone_complete", {
                         "zone": zone_id + 1,
                         "total_zones": self.total_zones,
                         "total_businesses": len(self.data.place_ids),
-                        "percent": int(self.zones_done / self.total_zones * 100)
+                        "percent": phase1_percent,
+                        "global_percent": phase1_percent
                     })
             except:
                 async with self._zone_lock:
@@ -512,6 +496,7 @@ class GMBScraperProduction:
         async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
             found = 0
             processed = 0
+            total_sites = len(websites)
             semaphore = asyncio.Semaphore(EMAIL_CONCURRENT)
 
             async def process_site(pid: str, url: str):
@@ -531,11 +516,15 @@ class GMBScraperProduction:
                         pass
                     finally:
                         processed += 1
-                        if processed % 20 == 0:
+                        # Phase 3 = 80-100% of total progress
+                        phase3_progress = int((processed / total_sites) * 20)
+                        global_percent = 80 + phase3_progress
+                        if processed % 10 == 0 or processed == total_sites:
                             emit("email_extraction_progress", {
                                 "processed": processed,
-                                "total": len(websites),
-                                "found": found
+                                "total": total_sites,
+                                "found": found,
+                                "global_percent": global_percent
                             })
 
             # Process in batches
@@ -543,12 +532,6 @@ class GMBScraperProduction:
             for i in range(0, len(websites), batch_size):
                 batch = websites[i:i+batch_size]
                 await asyncio.gather(*[process_site(pid, url) for pid, url in batch])
-
-            emit("email_extraction_progress", {
-                "processed": len(websites),
-                "total": len(websites),
-                "found": found
-            })
 
             return found
 
@@ -587,7 +570,7 @@ class GMBScraperProduction:
                     zones.append((lat, lng, zone_id))
                     zone_id += 1
 
-            # PHASE 1
+            # PHASE 1 - 0 to 40%
             emit("status", {"message": f"Phase 1: Collecte des IDs ({self.total_zones} zones)..."})
 
             phase1_workers = min(PHASE1_WORKERS, max(5, self.total_zones // 20))
@@ -599,30 +582,68 @@ class GMBScraperProduction:
                 for i in range(min(phase1_workers, len(zone_chunks)))
             ])
 
-            # PHASE 2
+            # PHASE 2 - 40 to 80%
             all_pids = self.data.get_all_ids()
             if all_pids:
-                emit("extraction_start", {"total": len(all_pids)})
+                emit("extraction_start", {"total": len(all_pids), "global_percent": 40})
                 emit("status", {"message": f"Phase 2: Extraction ({len(all_pids)} fiches)..."})
 
                 chunk_size = (len(all_pids) + PHASE2_WORKERS - 1) // PHASE2_WORKERS
                 pid_chunks = [all_pids[i:i+chunk_size] for i in range(0, len(all_pids), chunk_size)]
 
+                # Track phase 2 progress
+                total_pids = len(all_pids)
+                
+                async def phase2_with_progress(browser, worker_id, pids):
+                    context = await browser.new_context(
+                        viewport={"width": 1280, "height": 720},
+                        locale="fr-FR",
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    )
+                    init_page = await context.new_page()
+                    try:
+                        await init_page.goto("https://www.google.com/maps", timeout=20000)
+                        await asyncio.sleep(2)
+                        await self.accept_cookies(init_page)
+                        await asyncio.sleep(1)
+                    except:
+                        pass
+                    await init_page.close()
+
+                    for pid in pids:
+                        await self.extract_single_pid(context, pid)
+                        await asyncio.sleep(0.2)
+                        
+                        # Emit progress for phase 2
+                        current_extracted = self.extracted_count + self.failed_count
+                        if current_extracted % 20 == 0:
+                            phase2_progress = int((current_extracted / total_pids) * 40)
+                            global_percent = 40 + phase2_progress
+                            emit("extraction_progress", {
+                                "extracted": self.extracted_count,
+                                "total": total_pids,
+                                "global_percent": min(global_percent, 80)
+                            })
+
+                    await context.close()
+
                 await asyncio.gather(*[
-                    self.phase2_worker(browser, i, pid_chunks[i])
+                    phase2_with_progress(browser, i, pid_chunks[i])
                     for i in range(min(PHASE2_WORKERS, len(pid_chunks)))
                 ])
 
             await browser.close()
 
-        # PHASE 3 - Advanced Email Extraction
+        # PHASE 3 - 80 to 100%
         websites = [(pid, b['website']) for pid, b in self.data.businesses.items() 
                     if b.get('website') and not b.get('email')]
         
         emails_found = 0
         if websites:
-            emit("status", {"message": f"Phase 3: Enrichissement emails ({len(websites)} sites)..."})
+            emit("status", {"message": f"Phase 3: Enrichissement emails ({len(websites)} sites)...", "global_percent": 80})
             emails_found = await self.extract_emails_advanced(websites)
+        else:
+            emit("extraction_progress", {"global_percent": 100})
 
         # Final stats
         businesses = list(self.data.businesses.values())

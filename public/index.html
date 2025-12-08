@@ -304,11 +304,13 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
+    /* FIXED: Opaque background for table header */
     th {
-      background: rgba(79, 172, 254, 0.1);
+      background: #1e2a3a;
       font-weight: 600;
       position: sticky;
       top: 0;
+      z-index: 10;
     }
 
     tr:hover {
@@ -681,6 +683,7 @@
       document.getElementById('startBtn').disabled = false;
       document.getElementById('progressStatus').textContent = 'Termine!';
       document.getElementById('progressSpinner').style.display = 'none';
+      updateProgress(100);
       
       if (durationInterval) {
         clearInterval(durationInterval);
@@ -778,7 +781,9 @@
 
       eventSource.addEventListener('zone_complete', (e) => {
         const data = JSON.parse(e.data);
-        updateProgress(data.percent);
+        // Use global_percent if available, otherwise use percent
+        const percent = data.global_percent !== undefined ? data.global_percent : data.percent;
+        updateProgress(percent);
       });
 
       eventSource.addEventListener('zone_links', (e) => {
@@ -792,7 +797,16 @@
         const data = JSON.parse(e.data);
         log(`Extraction details: ${data.total} fiches`, 'info');
         setPhase(3);
-        updateProgress(0);
+        if (data.global_percent !== undefined) {
+          updateProgress(data.global_percent);
+        }
+      });
+
+      eventSource.addEventListener('extraction_progress', (e) => {
+        const data = JSON.parse(e.data);
+        if (data.global_percent !== undefined) {
+          updateProgress(data.global_percent);
+        }
       });
 
       eventSource.addEventListener('business', (e) => {
@@ -815,6 +829,7 @@
         const data = JSON.parse(e.data);
         log(`Enrichissement emails: ${data.total_sites} sites a crawler`, 'email');
         setPhase(4);
+        updateProgress(80);
       });
 
       eventSource.addEventListener('email_found', (e) => {
@@ -826,14 +841,20 @@
         document.getElementById('statEmails').textContent = emailCount;
       });
 
-      eventSource.addEventListener('email_crawl_page', (e) => {
+      eventSource.addEventListener('email_extraction_progress', (e) => {
         const data = JSON.parse(e.data);
-        log(`Crawl: ${data.page} (${data.processed}/${data.total})`, 'email');
+        if (data.global_percent !== undefined) {
+          updateProgress(data.global_percent);
+        }
+        log(`Emails: ${data.processed}/${data.total} sites (${data.found} trouves)`, 'email');
       });
 
       eventSource.addEventListener('status', (e) => {
         const data = JSON.parse(e.data);
         log(data.message, 'info');
+        if (data.global_percent !== undefined) {
+          updateProgress(data.global_percent);
+        }
       });
 
       eventSource.addEventListener('complete', (e) => {
