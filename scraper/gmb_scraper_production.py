@@ -56,17 +56,58 @@ CITY_COORDS = {
     'nimes': (43.8367, 4.3601),
 }
 
-# Email patterns to exclude
+# Email patterns to exclude - COMPREHENSIVE LIST
 INVALID_EMAIL_PATTERNS = [
-    'example', 'test', 'sample', 'demo', 'fake',
+    # Placeholder/example emails (EN + FR)
+    'example', 'exemple', 'sample', 'demo', 'fake', 'test',
+    'your-email', 'votre-email', 'votre-mail', 'your-mail',
+    'yourname', 'votrenom', 'votremail', 'youremail',
+    'nom@', 'prenom@', 'name@', 'firstname@', 'lastname@',
+    'email@email', 'mail@mail', 'user@user',
+    'xxx@', 'abc@', 'aaa@', 'zzz@', 'info@example', 'contact@example',
+    '@exemple.', '@example.', '@test.', '@demo.', '@fake.',
+    '@domain.', '@yourdomain', '@votredomaine', '@mondomaine',
+    'placeholder', 'changeme', 'replace',
+    
+    # Big tech / platforms
     'google', 'facebook', 'twitter', 'instagram', 'linkedin',
+    'youtube', 'tiktok', 'pinterest', 'snapchat',
+    
+    # CMS / Builders / Services
     'sentry', 'wix', 'wordpress', 'squarespace', 'shopify',
-    'jquery', 'bootstrap', 'script', 'style', 'admin',
+    'webflow', 'jimdo', 'weebly', 'godaddy', 'ionos',
+    'ovh', 'cloudflare', 'netlify', 'vercel', 'heroku',
+    
+    # Code/scripts
+    'jquery', 'bootstrap', 'script', 'style', 'webpack',
+    'node_modules', 'npm', 'yarn', 'github', 'gitlab',
+    
+    # File extensions in email (images, assets)
     '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
-    '.css', '.js', '.map', '.min', '.bundle',
-    'noreply', 'no-reply', 'donotreply', 'mailer-daemon',
-    'postmaster', 'webmaster', 'hostmaster', 'abuse',
-    '@sentry', '@wix', '@google', '@facebook'
+    '.css', '.js', '.map', '.min', '.bundle', '.chunk',
+    '.pdf', '.doc', '.zip', '.rar',
+    
+    # System/automated emails
+    'noreply', 'no-reply', 'donotreply', 'do-not-reply',
+    'mailer-daemon', 'postmaster', 'webmaster', 'hostmaster',
+    'abuse', 'spam', 'bounce', 'return', 'unsubscribe',
+    'newsletter', 'notification', 'alert', 'system', 'auto',
+    'robot', 'bot@', 'daemon', 'root@', 'admin@localhost',
+    
+    # Invalid TLDs / patterns
+    '@sentry.', '@wix.', '@google.', '@facebook.',
+    '.local', '.localhost', '.internal', '.invalid', '.test',
+    '@127.', '@192.168.', '@10.0.',
+]
+
+# Invalid email domains (exact match)
+INVALID_DOMAINS = [
+    'example.com', 'exemple.com', 'example.fr', 'exemple.fr',
+    'test.com', 'test.fr', 'demo.com', 'fake.com',
+    'domain.com', 'domain.fr', 'yourdomain.com', 'votredomaine.fr',
+    'email.com', 'mail.com', 'website.com', 'site.com',
+    'company.com', 'entreprise.fr', 'societe.fr',
+    'sentry.io', 'wix.com', 'squarespace.com',
 ]
 
 
@@ -76,15 +117,46 @@ def emit(event_type: str, data: dict):
 
 
 def is_valid_email(email: str) -> bool:
-    """Check if email is valid and not spam/system"""
-    email_lower = email.lower()
-    if len(email) < 6 or len(email) > 254:
+    """Check if email is valid and not spam/system/placeholder"""
+    email_lower = email.lower().strip()
+    
+    # Basic format check
+    if len(email_lower) < 6 or len(email_lower) > 254:
         return False
-    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email_lower):
         return False
+    
+    # Check for invalid patterns
     for pattern in INVALID_EMAIL_PATTERNS:
         if pattern in email_lower:
             return False
+    
+    # Check domain
+    try:
+        domain = email_lower.split('@')[1]
+        if domain in INVALID_DOMAINS:
+            return False
+        # Reject very short domains (likely fake)
+        if len(domain) < 4:
+            return False
+        # Reject domains that look like placeholders
+        if re.match(r'^[a-z]\.[a-z]{2,3}$', domain):  # a.com, b.fr, etc.
+            return False
+    except:
+        return False
+    
+    # Check local part (before @)
+    local_part = email_lower.split('@')[0]
+    # Reject very short local parts
+    if len(local_part) < 2:
+        return False
+    # Reject numeric-only local parts
+    if local_part.isdigit():
+        return False
+    # Reject obvious placeholders
+    if re.match(r'^(x+|a+|z+|test|user|mail|email|info|contact)$', local_part):
+        return False
+    
     return True
 
 
