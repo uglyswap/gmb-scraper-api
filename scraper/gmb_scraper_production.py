@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 """
-GMB Scraper PRODUCTION v5.0 - ARIA-LABEL SELECTOR (most stable)
+GMB Scraper PRODUCTION v5.1 - Filter invalid names like "Résultats"
 
-Reverse engineering results (10 tests):
-- Both buttons have SAME blue color: rgb(11, 87, 208)
-- Both buttons have SAME class: UywwFc-LgbsSe
-- ONLY difference is aria-label:
-  - "Tout accepter" (FR)
-  - "Accept all" (EN)
-
-USE: [aria-label="..."] selector - most stable!
+Changes from v5.0:
+- Filter "Résultats", "Results", "Recherche", "Search" as invalid names
+- These appear when stuck on search results page instead of business page
 """
 
 import asyncio
@@ -43,6 +38,15 @@ INITIAL_PAGE_DELAY = 4.0
 RETRY_ATTEMPTS = 3
 EMAIL_TIMEOUT = 8
 EMAIL_CONCURRENT = 30
+
+# v5.1: Invalid business names (search results page, consent, etc.)
+INVALID_NAMES = [
+    'résultats', 'resultats', 'results',
+    'recherche', 'search',
+    'consent', 'google maps', 'google',
+    'before you continue', "avant d'accéder",
+    'maps', 'plan', 'itinéraire'
+]
 
 CONTACT_PAGES = [
     '', '/contact', '/contacts', '/contactez-nous', '/nous-contacter',
@@ -92,6 +96,17 @@ INVALID_DOMAINS = [
 def emit(event_type: str, data: dict):
     event = {"type": event_type, "timestamp": datetime.now().isoformat(), **data}
     print(json.dumps(event, ensure_ascii=False), flush=True)
+
+
+def is_valid_business_name(name: str) -> bool:
+    """v5.1: Check if name is a valid business name"""
+    if not name or len(name) < 3:
+        return False
+    name_lower = name.lower().strip()
+    for invalid in INVALID_NAMES:
+        if name_lower == invalid or name_lower.startswith(invalid + ' '):
+            return False
+    return True
 
 
 def is_valid_email(email: str) -> bool:
@@ -208,10 +223,7 @@ class GMBScraperProduction:
         return handler
 
     async def accept_cookies(self, page: Page) -> bool:
-        """
-        v5.0: Use aria-label selector - most stable!
-        Both buttons have same color/class, only aria-label differs.
-        """
+        """v5.0: Use aria-label selector - most stable!"""
         try:
             current_url = page.url
 
@@ -221,14 +233,11 @@ class GMBScraperProduction:
             logger.info(f"[CONSENT] Page detected")
             await asyncio.sleep(1.0)
 
-            # v5.0: ARIA-LABEL selectors (most stable)
-            # Tested: color and class are SAME for both buttons
             consent_selectors = [
-                '[aria-label="Tout accepter"]',      # FR
-                '[aria-label="Accept all"]',         # EN
-                '[aria-label="Alle akzeptieren"]',   # DE
-                '[aria-label="Alles accepteren"]',   # NL
-                # Fallback: text-based
+                '[aria-label="Tout accepter"]',
+                '[aria-label="Accept all"]',
+                '[aria-label="Alle akzeptieren"]',
+                '[aria-label="Alles accepteren"]',
                 'button:has-text("Tout accepter")',
                 'button:has-text("Accept all")',
             ]
@@ -353,11 +362,7 @@ class GMBScraperProduction:
                     const el = document.querySelector(sel);
                     if (el && el.textContent) {
                         const name = el.textContent.trim();
-                        if (name.length > 2 &&
-                            !name.toLowerCase().includes("consent") &&
-                            !name.toLowerCase().includes("google maps") &&
-                            !name.toLowerCase().includes("before you continue") &&
-                            !name.toLowerCase().includes("avant d'accéder")) {
+                        if (name.length > 2) {
                             d.name = name;
                             break;
                         }
@@ -406,14 +411,15 @@ class GMBScraperProduction:
                 const catBtn = document.querySelector('button[jsaction*="category"], span.DkEaL');
                 if (catBtn) d.category = catBtn.textContent?.trim() || '';
 
-                d._debug_title = document.title;
                 d._debug_h1 = document.querySelector('h1')?.textContent?.substring(0, 80) || 'NO H1';
 
                 return d;
             }''')
 
-            if data.get('name') and len(data['name']) > 2:
-                data.pop('_debug_title', None)
+            name = data.get('name', '')
+            
+            # v5.1: Validate business name
+            if name and is_valid_business_name(name):
                 data.pop('_debug_h1', None)
                 data['place_id'] = pid
                 data['google_maps_url'] = f"https://www.google.com/maps/place/?q=place_id:{pid}"
@@ -436,12 +442,12 @@ class GMBScraperProduction:
                     emit("business", data)
                 success = True
             elif attempt < RETRY_ATTEMPTS:
-                logger.warning(f"[EXTRACT FAIL] {pid[:20]} - h1: {data.get('_debug_h1', 'N/A')[:50]}")
+                logger.warning(f"[EXTRACT FAIL] {pid[:20]} - invalid name: '{name}' h1: {data.get('_debug_h1', 'N/A')[:30]}")
                 await page.close()
                 await asyncio.sleep(1.0)
                 return await self.extract_single_pid(context, pid, total_pids, attempt + 1)
             else:
-                logger.warning(f"[EXTRACT FAILED] {pid[:20]} after {attempt} attempts")
+                logger.warning(f"[EXTRACT FAILED] {pid[:20]} after {attempt} attempts - name: '{name}'")
                 async with self._extract_lock:
                     self.failed_count += 1
 
@@ -546,7 +552,7 @@ class GMBScraperProduction:
             "city": self.city,
             "grid_size": self.grid_size,
             "total_zones": self.total_zones,
-            "version": "v5.0 - aria-label selector (most stable)"
+            "version": "v5.1 - filter invalid names (Résultats)"
         })
 
         async with async_playwright() as p:
