@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-GMB Scraper PRODUCTION v4.9 - FINAL CONSENT FIX
+GMB Scraper PRODUCTION v5.0 - ARIA-LABEL SELECTOR (most stable)
 
-ROOT CAUSE: Google consent patterns found via reverse engineering:
-- "Tout accepter" (French)
-- "Accept all" (English)
-- "Alle akzeptieren" (German)
-- "Alles accepteren" (Dutch)
+Reverse engineering results (10 tests):
+- Both buttons have SAME blue color: rgb(11, 87, 208)
+- Both buttons have SAME class: UywwFc-LgbsSe
+- ONLY difference is aria-label:
+  - "Tout accepter" (FR)
+  - "Accept all" (EN)
 
-Tested: 50 requests, 8 locales (fr-FR, en-US, en-GB, de-DE, nl-NL, etc.)
+USE: [aria-label="..."] selector - most stable!
 """
 
 import asyncio
@@ -208,44 +209,45 @@ class GMBScraperProduction:
 
     async def accept_cookies(self, page: Page) -> bool:
         """
-        v4.9 FINAL: Patterns found via reverse engineering (50 requests, 8 locales)
+        v5.0: Use aria-label selector - most stable!
+        Both buttons have same color/class, only aria-label differs.
         """
         try:
             current_url = page.url
 
-            # Not on consent page? Done.
             if 'consent' not in current_url.lower():
                 return True
 
-            logger.info(f"[CONSENT] Detected consent page: {current_url[:60]}")
+            logger.info(f"[CONSENT] Page detected")
             await asyncio.sleep(1.0)
 
-            # v4.9: EXACT patterns from reverse engineering
-            # Tested with: fr-FR, en-US, en-GB, de-DE, nl-NL
-            consent_patterns = [
-                'button:has-text("Tout accepter")',      # FR - most common
-                'button:has-text("Accept all")',         # EN-GB
-                'button:has-text("Alle akzeptieren")',   # DE
-                'button:has-text("Alles accepteren")',   # NL
+            # v5.0: ARIA-LABEL selectors (most stable)
+            # Tested: color and class are SAME for both buttons
+            consent_selectors = [
+                '[aria-label="Tout accepter"]',      # FR
+                '[aria-label="Accept all"]',         # EN
+                '[aria-label="Alle akzeptieren"]',   # DE
+                '[aria-label="Alles accepteren"]',   # NL
+                # Fallback: text-based
+                'button:has-text("Tout accepter")',
+                'button:has-text("Accept all")',
             ]
 
-            for selector in consent_patterns:
+            for selector in consent_selectors:
                 try:
                     btn = await page.query_selector(selector)
-                    if btn:
-                        is_visible = await btn.is_visible()
-                        if is_visible:
-                            logger.info(f"[CONSENT] Clicking: {selector}")
-                            await btn.click()
-                            await asyncio.sleep(1.5)
+                    if btn and await btn.is_visible():
+                        logger.info(f"[CONSENT] Clicking: {selector}")
+                        await btn.click()
+                        await asyncio.sleep(1.5)
 
-                            if 'consent' not in page.url.lower():
-                                logger.info(f"[CONSENT OK]")
-                                return True
+                        if 'consent' not in page.url.lower():
+                            logger.info("[CONSENT OK]")
+                            return True
                 except:
                     continue
 
-            logger.error("[CONSENT] No pattern matched")
+            logger.warning("[CONSENT] No selector matched")
             return False
 
         except Exception as e:
@@ -271,10 +273,8 @@ class GMBScraperProduction:
             await page.goto(initial_url, wait_until="networkidle", timeout=45000)
             await asyncio.sleep(INITIAL_PAGE_DELAY)
 
-            # Handle consent
             await self.accept_cookies(page)
 
-            # If still on consent, try navigating again
             if 'consent' in page.url.lower():
                 logger.info(f"[WORKER {worker_id}] Still on consent, re-navigating...")
                 await page.goto(initial_url, wait_until="networkidle", timeout=45000)
@@ -294,7 +294,6 @@ class GMBScraperProduction:
                 await page.goto(url, wait_until="networkidle", timeout=30000)
                 await asyncio.sleep(PAGE_DELAY)
 
-                # Check for consent
                 if 'consent' in page.url.lower():
                     await self.accept_cookies(page)
                     await page.goto(url, wait_until="networkidle", timeout=30000)
@@ -328,17 +327,14 @@ class GMBScraperProduction:
         success = False
 
         try:
-            # v4.9: Use the most reliable URL format
             url = f"https://www.google.com/maps/search/?api=1&query=Google&query_place_id={pid}"
 
             if attempt > 1:
-                # Try alternative format on retry
                 url = f"https://www.google.com/maps/place/?q=place_id:{pid}"
 
             await page.goto(url, wait_until="networkidle", timeout=30000)
             await asyncio.sleep(2.5)
 
-            # Handle consent if needed
             if "consent" in page.url.lower():
                 logger.info(f"[EXTRACT] Consent for {pid[:20]}")
                 await self.accept_cookies(page)
@@ -476,7 +472,6 @@ class GMBScraperProduction:
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
 
-        # Initialize with consent handling
         init_page = await context.new_page()
         try:
             await init_page.goto("https://www.google.com/maps", wait_until="networkidle", timeout=30000)
@@ -551,7 +546,7 @@ class GMBScraperProduction:
             "city": self.city,
             "grid_size": self.grid_size,
             "total_zones": self.total_zones,
-            "version": "v4.9 - Final consent fix (Tout accepter / Accept all)"
+            "version": "v5.0 - aria-label selector (most stable)"
         })
 
         async with async_playwright() as p:
