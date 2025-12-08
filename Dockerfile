@@ -15,13 +15,14 @@ RUN npm install
 COPY tsconfig.json ./
 COPY src ./src
 
-# Production image with Python + Playwright (v1.40.0 has pip3 pre-installed)
+# Production image with Python + Playwright
 FROM mcr.microsoft.com/playwright:v1.40.0-jammy
 
 WORKDIR /app
 
-# Install Node.js 20 without apt-get update (use cached repos)
-RUN apt-get install -y --no-install-recommends curl && \
+# Install Node.js 20 AND python3-pip (pip3 not included in base image)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl python3-pip && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     apt-get clean && \
