@@ -280,7 +280,8 @@ class GMBScraperProduction:
                 url = response.url
                 if 'google' not in url:
                     return
-                if '/search' in url or '/maps/preview/place' in url or '/place/' in url:
+                # Intercepter TOUS les endpoints contenant des IDs (reverse engineering 2025-12-08)
+                if '/search' in url or '/maps/rpc' in url or '/maps/preview/place' in url or '/place/' in url:
                     body = await response.text()
                     if len(body) > 500:
                         ids = self.extract_place_ids(body)
