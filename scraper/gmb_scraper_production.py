@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-GMB Scraper PRODUCTION v4.1 FIXED
+GMB Scraper PRODUCTION v4.2 - Robust Extraction
 - Up to 3025 zones (55x55)
 - Advanced email enrichment with page crawling
 - 40 workers for optimal performance
-- FIXED: Email filtering, progress bar accuracy
+- FIXED v4.1: Email filtering, progress bar accuracy
+- FIXED v4.2: Robust place_id extraction (supports ChIJ + hex formats via stable patterns)
 """
 
 import asyncio
@@ -235,7 +236,26 @@ class GMBScraperProduction:
             self.lat, self.lng = CITY_COORDS['paris']
 
     def extract_place_ids(self, body: str) -> List[str]:
-        return list(set(re.findall(r'ChIJ[A-Za-z0-9_-]{20,50}', body)))
+        """
+        Extraction robuste des place_ids - supporte tous les formats Google:
+        - ChIJ... (format classique)
+        - 0x...:0x... (format hexadecimal/feature_id)
+        Utilise des patterns STABLES (!1s, place_id, ftid) pour resister aux changements Google
+        """
+        ids = set()
+        
+        # Pattern 1: !1s suivi de l'ID (stable dans les URLs Google Maps)
+        ids.update(re.findall(r'!1s([A-Za-z0-9_:-]+)', body))
+        
+        # Pattern 2: place_id, ftid, feature_id dans JSON/HTML
+        ids.update(re.findall(r'(?:place_id|ftid|feature_id)["\']?\s*[:=]\s*["\']?([A-Za-z0-9_:-]+)', body, re.IGNORECASE))
+        
+        # Pattern 3: Anciens formats directs (fallback)
+        ids.update(re.findall(r'ChIJ[A-Za-z0-9_-]{20,50}', body))
+        ids.update(re.findall(r'0x[a-f0-9]+:0x[a-f0-9]+', body, re.IGNORECASE))
+        
+        # Filtrer les IDs trop courts (faux positifs) et nettoyer
+        return [pid for pid in ids if len(pid) > 15]
 
     async def create_response_handler(self):
         async def handler(response: Response):
@@ -581,7 +601,7 @@ class GMBScraperProduction:
             "grid_size": self.grid_size,
             "total_zones": self.total_zones,
             "cell_size_km": round(self.cell_size * 111, 2),
-            "version": f"v4.1 FIXED - 40 workers, {self.total_zones} zones"
+            "version": f"v4.2 Robust - 40 workers, {self.total_zones} zones"
         })
 
         async with async_playwright() as p:
