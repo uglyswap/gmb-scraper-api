@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GMB Scraper API - v4.1 FIXED</title>
+  <title>GMB Scraper API - v4.2</title>
   <style>
     * {
       margin: 0;
@@ -452,7 +452,7 @@
       <h1>GMB Scraper API</h1>
       <p class="subtitle">Extraction de donnees Google My Business</p>
       <div class="badges">
-        <span class="badge badge-success">v4.1 FIXED</span>
+        <span class="badge badge-success">v4.2</span>
         <span class="badge badge-info">40 Workers</span>
         <span class="badge badge-warning">Max 3025 zones</span>
         <span class="badge badge-purple">Email Enrichment</span>
@@ -617,6 +617,15 @@
       document.getElementById('gridInfo').textContent = `${zones} zones = ~${cellSize}km par cellule`;
     });
 
+    function formatDuration(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      if (mins > 0) {
+        return mins + 'm ' + secs.toString().padStart(2, '0') + 's';
+      }
+      return secs + 's';
+    }
+
     function log(message, type = 'info') {
       const container = document.getElementById('logContainer');
       const entry = document.createElement('div');
@@ -641,13 +650,13 @@
       if (stats.with_email !== undefined) document.getElementById('statEmails').textContent = stats.with_email;
       if (stats.with_website !== undefined) document.getElementById('statWebsites').textContent = stats.with_website;
       if (stats.with_address !== undefined) document.getElementById('statAddresses').textContent = stats.with_address;
-      if (stats.duration_seconds !== undefined) document.getElementById('statDuration').textContent = stats.duration_seconds + 's';
+      if (stats.duration_seconds !== undefined) document.getElementById('statDuration').textContent = formatDuration(stats.duration_seconds);
     }
 
     function updateDuration() {
       if (startTime) {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        document.getElementById('statDuration').textContent = elapsed + 's';
+        document.getElementById('statDuration').textContent = formatDuration(elapsed);
       }
     }
 
