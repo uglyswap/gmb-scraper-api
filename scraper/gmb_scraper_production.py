@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GMB Scraper PRODUCTION v4.5 - FIXED Headless Mode
+GMB Scraper PRODUCTION v4.6 - FIXED Phase 2 Extraction
 - Up to 3025 zones (55x55)
 - Advanced email enrichment with page crawling
 - 40 workers for optimal performance
@@ -9,6 +9,7 @@ GMB Scraper PRODUCTION v4.5 - FIXED Headless Mode
 - FIXED v4.3: Added /maps/rpc endpoint interception
 - FIXED v4.4: Increased timeouts, better consent handling
 - FIXED v4.5: Headless mode fixes, networkidle wait, anti-detection, logging
+- FIXED v4.6: Phase 2 networkidle, better selectors, debug logging for extraction failures
 """
 
 import asyncio
@@ -456,78 +457,121 @@ class GMBScraperProduction:
     async def extract_single_pid(self, context, pid: str, total_pids: int, attempt: int = 1) -> bool:
         page = await context.new_page()
         success = False
-        
+
         try:
+            # Use direct place URL format
             url = f"https://www.google.com/maps/place/?q=place_id:{pid}"
-            await page.goto(url, wait_until="load", timeout=20000)
-            await asyncio.sleep(1.2)
+            await page.goto(url, wait_until="networkidle", timeout=30000)
+            await asyncio.sleep(2.5)  # Wait for dynamic content
 
             current_url = page.url
             if "consent" in current_url.lower():
+                logger.info(f"[EXTRACT] Consent detected for {pid[:20]}")
                 await self.accept_cookies(page)
-                await asyncio.sleep(1.5)
-                await page.goto(url, wait_until="load", timeout=20000)
-                await asyncio.sleep(1.2)
+                await asyncio.sleep(2)
+                await page.goto(url, wait_until="networkidle", timeout=30000)
+                await asyncio.sleep(2.5)
 
             data = await page.evaluate('''() => {
                 const d = {};
-                const nameSelectors = ['h1.DUwDvf', 'h1.fontHeadlineLarge', 'h1'];
+                // Try multiple name selectors
+                const nameSelectors = [
+                    'h1.DUwDvf',
+                    'h1.fontHeadlineLarge',
+                    'h1[data-attrid="title"]',
+                    'div[role="main"] h1',
+                    'h1'
+                ];
                 for (const sel of nameSelectors) {
                     const el = document.querySelector(sel);
                     if (el && el.textContent) {
                         const name = el.textContent.trim();
-                        if (name.length > 2 && !name.toLowerCase().includes("acceder") && 
-                            !name.toLowerCase().includes("consent") && !name.toLowerCase().includes("google")) {
+                        if (name.length > 2 &&
+                            !name.toLowerCase().includes("acceder") &&
+                            !name.toLowerCase().includes("consent") &&
+                            !name.toLowerCase().includes("google maps") &&
+                            !name.toLowerCase().includes("avant d'accéder")) {
                             d.name = name;
                             break;
                         }
                     }
                 }
-                const phoneBtn = document.querySelector('button[data-item-id*="phone"], a[href^="tel:"]');
-                if (phoneBtn) {
-                    const label = phoneBtn.getAttribute('aria-label') || phoneBtn.href || '';
-                    const match = label.match(/[0-9+][0-9\\s\\.\\-]{8,}/);
-                    if (match) {
-                        d.phone = match[0].replace(/[\\s\\.\\-]/g, '');
-                        d.phone_clean = d.phone.replace(/[^0-9+]/g, '');
+                // Phone - multiple selectors
+                const phoneSelectors = [
+                    'button[data-item-id*="phone"]',
+                    'a[href^="tel:"]',
+                    'button[aria-label*="téléphone"]',
+                    'button[aria-label*="phone"]'
+                ];
+                for (const sel of phoneSelectors) {
+                    const phoneBtn = document.querySelector(sel);
+                    if (phoneBtn) {
+                        const label = phoneBtn.getAttribute('aria-label') || phoneBtn.href || phoneBtn.textContent || '';
+                        const match = label.match(/[0-9+][0-9\\s\\.\\-]{8,}/);
+                        if (match) {
+                            d.phone = match[0].replace(/[\\s\\.\\-]/g, '');
+                            d.phone_clean = d.phone.replace(/[^0-9+]/g, '');
+                            break;
+                        }
                     }
                 }
-                const webLink = document.querySelector('a[data-item-id="authority"]');
-                if (webLink && webLink.href && !webLink.href.includes('google.com')) {
-                    d.website = webLink.href;
+                // Website
+                const webSelectors = [
+                    'a[data-item-id="authority"]',
+                    'a[data-tooltip="Ouvrir le site Web"]',
+                    'a[aria-label*="site"]'
+                ];
+                for (const sel of webSelectors) {
+                    const webLink = document.querySelector(sel);
+                    if (webLink && webLink.href && !webLink.href.includes('google.com')) {
+                        d.website = webLink.href;
+                        break;
+                    }
                 }
-                const addrBtn = document.querySelector('button[data-item-id="address"]');
+                // Address
+                const addrBtn = document.querySelector('button[data-item-id="address"], button[aria-label*="Adresse"]');
                 if (addrBtn) {
-                    const label = addrBtn.getAttribute('aria-label') || '';
+                    const label = addrBtn.getAttribute('aria-label') || addrBtn.textContent || '';
                     d.address = label.replace(/^Adresse\\s*:\\s*/i, '').trim();
                 }
-                const ratingEl = document.querySelector('div.F7nice span[aria-hidden="true"]');
+                // Rating
+                const ratingEl = document.querySelector('div.F7nice span[aria-hidden="true"], span.ceNzKf');
                 if (ratingEl) {
                     const rating = parseFloat(ratingEl.textContent?.replace(',', '.'));
                     if (!isNaN(rating) && rating > 0 && rating <= 5) d.rating = rating;
                 }
-                const reviewEl = document.querySelector('div.F7nice span[aria-label*="avis"]');
+                // Review count
+                const reviewEl = document.querySelector('div.F7nice span[aria-label*="avis"], span[aria-label*="review"]');
                 if (reviewEl) {
                     const text = (reviewEl.getAttribute('aria-label') || '').match(/[\\d\\s]+/);
                     if (text) d.review_count = parseInt(text[0].replace(/\\s/g, ''));
                 }
-                const catBtn = document.querySelector('button[jsaction*="category"]');
+                // Category
+                const catBtn = document.querySelector('button[jsaction*="category"], span.DkEaL');
                 if (catBtn) d.category = catBtn.textContent?.trim() || '';
+
+                // Debug: what's on the page
+                d._debug_title = document.title;
+                d._debug_h1 = document.querySelector('h1')?.textContent?.substring(0, 50) || 'NO H1';
                 return d;
             }''')
 
             if data.get('name') and len(data['name']) > 2:
+                # Remove debug fields before saving
+                data.pop('_debug_title', None)
+                data.pop('_debug_h1', None)
                 data['place_id'] = pid
                 data['google_maps_url'] = f"https://www.google.com/maps/place/?q=place_id:{pid}"
                 is_new = await self.data.add_business(pid, data)
                 if is_new:
                     async with self._extract_lock:
                         self.extracted_count += 1
-                        # Émettre progression Phase 2 (40-80%)
                         current = self.extracted_count + self.failed_count
+                        # Log every 50 extractions
+                        if self.extracted_count % 50 == 0:
+                            logger.info(f"[EXTRACT] {self.extracted_count} businesses extracted so far")
                         phase2_progress = int((current / total_pids) * 40)
                         global_percent = 40 + phase2_progress
-                        # Émettre tous les 5 extractions ou si c'est la dernière
                         if current % 5 == 0 or current >= total_pids:
                             emit("extraction_progress", {
                                 "extracted": self.extracted_count,
@@ -538,10 +582,15 @@ class GMBScraperProduction:
                     emit("business", data)
                 success = True
             elif attempt < RETRY_ATTEMPTS:
+                # Log why extraction failed on first attempt
+                if attempt == 1:
+                    logger.warning(f"[EXTRACT FAIL] {pid[:20]} - title: {data.get('_debug_title', 'N/A')[:30]}, h1: {data.get('_debug_h1', 'N/A')[:30]}")
                 await page.close()
                 await asyncio.sleep(0.5)
                 return await self.extract_single_pid(context, pid, total_pids, attempt + 1)
             else:
+                # Log final failure
+                logger.warning(f"[EXTRACT FAILED] {pid[:20]} after {attempt} attempts - h1: {data.get('_debug_h1', 'N/A')[:40]}")
                 async with self._extract_lock:
                     self.failed_count += 1
         except:
@@ -690,7 +739,7 @@ class GMBScraperProduction:
             "grid_size": self.grid_size,
             "total_zones": self.total_zones,
             "cell_size_km": round(self.cell_size * 111, 2),
-            "version": f"v4.5 Fixed - networkidle, anti-detection, {self.total_zones} zones"
+            "version": f"v4.6 Fixed - Phase2 networkidle, better selectors, {self.total_zones} zones"
         })
 
         async with async_playwright() as p:
