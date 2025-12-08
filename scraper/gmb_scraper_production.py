@@ -237,25 +237,42 @@ class GMBScraperProduction:
 
     def extract_place_ids(self, body: str) -> List[str]:
         """
-        Extraction robuste des place_ids - supporte tous les formats Google:
-        - ChIJ... (format classique)
-        - 0x...:0x... (format hexadecimal/feature_id)
-        Utilise des patterns STABLES (!1s, place_id, ftid) pour resister aux changements Google
+        Extraction STRICTE des place_ids avec validation de longueur exacte.
+        Reverse engineering Google Maps API (2025-12-08):
+        - ChIJ: exactement 27 caracteres (ChIJ + 23 chars base64)
+        - Hex: 36-37 caracteres (0x[16]:0x[15-16])
         """
         ids = set()
-        
-        # Pattern 1: !1s suivi de l'ID (stable dans les URLs Google Maps)
-        ids.update(re.findall(r'!1s([A-Za-z0-9_:-]+)', body))
-        
-        # Pattern 2: place_id, ftid, feature_id dans JSON/HTML
-        ids.update(re.findall(r'(?:place_id|ftid|feature_id)["\']?\s*[:=]\s*["\']?([A-Za-z0-9_:-]+)', body, re.IGNORECASE))
-        
-        # Pattern 3: Anciens formats directs (fallback)
-        ids.update(re.findall(r'ChIJ[A-Za-z0-9_-]{20,50}', body))
-        ids.update(re.findall(r'0x[a-f0-9]+:0x[a-f0-9]+', body, re.IGNORECASE))
-        
-        # Filtrer les IDs trop courts (faux positifs) et nettoyer
-        return [pid for pid in ids if len(pid) > 15]
+
+        # Pattern 1: ChIJ - exactement 23 chars apres ChIJ = 27 total
+        ids.update(re.findall(r'ChIJ[A-Za-z0-9_-]{23}', body))
+
+        # Pattern 2: Hex IDs - format strict avec longueur validee
+        ids.update(re.findall(r'0x[a-f0-9]{14,16}:0x[a-f0-9]{14,16}', body, re.IGNORECASE))
+
+        # Pattern 3: Dans JSON echappe (guillemets \")
+        ids.update(re.findall(r'\\"(ChIJ[A-Za-z0-9_-]{23})\\"', body))
+        ids.update(re.findall(r'\\"(0x[a-f0-9]{14,16}:0x[a-f0-9]{14,16})\\"', body, re.IGNORECASE))
+
+        # Pattern 4: Dans !1s protobuf (avec limite stricte)
+        ids.update(re.findall(r'!1s(ChIJ[A-Za-z0-9_-]{23})(?:[!&"]|$)', body))
+        ids.update(re.findall(r'!1s(0x[a-f0-9]{14,16}:0x[a-f0-9]{14,16})(?:[!&"]|$)', body, re.IGNORECASE))
+
+        # Pattern 5: place_id= ou ftid= avec limite
+        ids.update(re.findall(r'(?:place_id|ftid)[=:](ChIJ[A-Za-z0-9_-]{23})', body, re.IGNORECASE))
+        ids.update(re.findall(r'(?:place_id|ftid)[=:](0x[a-f0-9]{14,16}:0x[a-f0-9]{14,16})', body, re.IGNORECASE))
+
+        # Validation finale stricte
+        valid_ids = []
+        for pid in ids:
+            # ChIJ: exactement 27 caracteres
+            if pid.startswith('ChIJ') and len(pid) == 27:
+                valid_ids.append(pid)
+            # Hex: 36-37 caracteres (0x + 16 + : + 0x + 15-16)
+            elif pid.startswith('0x') and ':0x' in pid and 35 <= len(pid) <= 38:
+                valid_ids.append(pid)
+
+        return list(set(valid_ids))
 
     async def create_response_handler(self):
         async def handler(response: Response):
