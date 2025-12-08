@@ -16,12 +16,12 @@ COPY tsconfig.json ./
 COPY src ./src
 
 # Production image with Python + Playwright
+# IMPORTANT: Using v1.40.0 - Python playwright version MUST match
 FROM mcr.microsoft.com/playwright:v1.40.0-jammy
 
 WORKDIR /app
 
 # Install Node.js 20 AND python3-pip
-# Note: Ubuntu 22.04 has pip 22.x which doesn't need --break-system-packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl python3-pip && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -41,8 +41,10 @@ COPY scraper ./scraper
 # Copy public folder for web frontend
 COPY public ./public
 
-# Install Python dependencies (no --break-system-packages on pip 22.x)
-RUN pip3 install playwright aiohttp
+# Install Python dependencies
+# CRITICAL: playwright version MUST match the base image version (1.40.0)
+# Otherwise browsers won't be found and scraper will crash
+RUN pip3 install playwright==1.40.0 aiohttp
 
 # Environment variables
 ENV NODE_ENV=production
