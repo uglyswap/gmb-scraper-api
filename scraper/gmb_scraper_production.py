@@ -1,31 +1,45 @@
 #!/usr/bin/env python3
 """
-GMB Scraper PRODUCTION v4.2 - Robust Extraction
+GMB Scraper PRODUCTION v4.5 - FIXED Headless Mode
 - Up to 3025 zones (55x55)
 - Advanced email enrichment with page crawling
 - 40 workers for optimal performance
 - FIXED v4.1: Email filtering, progress bar accuracy
 - FIXED v4.2: Robust place_id extraction (supports ChIJ + hex formats via stable patterns)
+- FIXED v4.3: Added /maps/rpc endpoint interception
+- FIXED v4.4: Increased timeouts, better consent handling
+- FIXED v4.5: Headless mode fixes, networkidle wait, anti-detection, logging
 """
 
 import asyncio
 import re
 import json
 import sys
+import os
+import logging
 from datetime import datetime
 from typing import Dict, List, Set, Optional
 from urllib.parse import quote, urljoin, urlparse
 from playwright.async_api import async_playwright, Response
 import aiohttp
 
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Environment variables
+HEADLESS = os.environ.get('HEADLESS', 'true').lower() == 'true'
+DEBUG_MODE = os.environ.get('DEBUG', 'false').lower() == 'true'
+
 # CONFIG
 PHASE1_WORKERS = 15
 PHASE2_WORKERS = 40
 DEFAULT_GRID_SIZE = 10
 BASE_COVERAGE = 0.09  # ~10km total coverage
-SCROLL_COUNT = 6
-SCROLL_DELAY = 0.3
-PAGE_DELAY = 1.5
+SCROLL_COUNT = 8  # Increased from 6
+SCROLL_DELAY = 0.4  # Increased from 0.3
+PAGE_DELAY = 3.5  # CRITICAL: Increased from 1.5 - AJAX needs more time!
+INITIAL_PAGE_DELAY = 4.0  # For initial page load with consent
 RETRY_ATTEMPTS = 2
 EMAIL_TIMEOUT = 8
 EMAIL_CONCURRENT = 30
@@ -282,61 +296,108 @@ class GMBScraperProduction:
                     return
                 # Intercepter TOUS les endpoints contenant des IDs (reverse engineering 2025-12-08)
                 if '/search' in url or '/maps/rpc' in url or '/maps/preview/place' in url or '/place/' in url:
+                    if DEBUG_MODE:
+                        logger.info(f"[INTERCEPT] {url[:100]}...")
                     body = await response.text()
                     if len(body) > 500:
                         ids = self.extract_place_ids(body)
+                        if DEBUG_MODE:
+                            logger.info(f"[EXTRACT] {len(ids)} IDs from {len(body)} bytes")
                         if ids:
                             new = await self.data.add_ids(ids)
                             if new > 0:
+                                logger.info(f"[NEW IDS] +{new} IDs (total: {len(self.data.place_ids)})")
                                 emit("zone_links", {
                                     "unique_new": new,
                                     "total_ids": len(self.data.place_ids)
                                 })
-            except:
-                pass
+            except Exception as e:
+                if DEBUG_MODE:
+                    logger.error(f"[HANDLER ERROR] {str(e)[:100]}")
         return handler
 
     async def accept_cookies(self, page) -> bool:
+        """Accept Google consent with improved detection and logging"""
         try:
+            current_url = page.url
+            logger.info(f"[CONSENT] Checking consent on: {current_url[:80]}")
+
+            # Check if we're on consent page
+            if 'consent.google' in current_url:
+                logger.info("[CONSENT] Detected consent redirect - need to accept")
+
             selectors = [
                 'button:has-text("Tout accepter")',
                 'button:has-text("Accept all")',
+                'form[action*="consent"] button',
                 'button[aria-label*="accepter"]',
                 'button[aria-label*="Accept"]',
                 '#L2AGLb',
                 'button:has-text("J\'accepte")',
                 'button:has-text("Accepter")',
+                'button:has-text("Agree")',
+                'div[role="dialog"] button:first-of-type',
             ]
+
             for selector in selectors:
                 try:
                     btn = await page.query_selector(selector)
                     if btn:
+                        logger.info(f"[CONSENT] Found button with selector: {selector}")
                         await btn.click()
-                        await asyncio.sleep(0.5)
-                        return True
-                except:
+                        await asyncio.sleep(1.5)  # Increased wait after click
+
+                        # Verify we left consent page
+                        new_url = page.url
+                        if 'consent.google' not in new_url:
+                            logger.info(f"[CONSENT] SUCCESS - redirected to: {new_url[:80]}")
+                            return True
+                        else:
+                            logger.warning("[CONSENT] Still on consent page after click")
+                except Exception as e:
+                    if DEBUG_MODE:
+                        logger.debug(f"[CONSENT] Selector {selector} failed: {str(e)[:50]}")
                     continue
+
+            logger.warning("[CONSENT] No consent button found or clicked")
             return False
-        except:
+        except Exception as e:
+            logger.error(f"[CONSENT] Error: {str(e)[:100]}")
             return False
 
     async def phase1_worker(self, browser, worker_id: int, zones: List[tuple]):
+        logger.info(f"[WORKER {worker_id}] Starting with {len(zones)} zones")
+
         context = await browser.new_context(
             viewport={"width": 1920, "height": 1080},
             locale="fr-FR",
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
 
         page = await context.new_page()
         handler = await self.create_response_handler()
         page.on("response", handler)
 
+        # Initial page load with consent handling
+        initial_url = f"https://www.google.com/maps/search/{quote(f'{self.activity} {self.city}')}"
         try:
-            await page.goto(f"https://www.google.com/maps/search/{quote(f'{self.activity} {self.city}')}", timeout=30000)
-            await asyncio.sleep(1.5)
-            await self.accept_cookies(page)
-        except:
-            pass
+            logger.info(f"[WORKER {worker_id}] Loading initial page...")
+            await page.goto(initial_url, wait_until="networkidle", timeout=45000)
+            await asyncio.sleep(INITIAL_PAGE_DELAY)
+
+            # Handle consent
+            consent_accepted = await self.accept_cookies(page)
+
+            # CRITICAL: If consent was detected, re-navigate to search page
+            current_url = page.url
+            if 'consent' in current_url.lower() or consent_accepted:
+                logger.info(f"[WORKER {worker_id}] Re-navigating after consent...")
+                await page.goto(initial_url, wait_until="networkidle", timeout=45000)
+                await asyncio.sleep(INITIAL_PAGE_DELAY)
+
+            logger.info(f"[WORKER {worker_id}] Initial page loaded. URL: {page.url[:80]}")
+        except Exception as e:
+            logger.error(f"[WORKER {worker_id}] Initial page error: {str(e)[:100]}")
 
         for lat, lng, zone_id in zones:
             try:
@@ -349,25 +410,35 @@ class GMBScraperProduction:
 
                 zoom = 15 if self.grid_size <= 10 else (16 if self.grid_size <= 25 else 17)
                 url = f"https://www.google.com/maps/search/{quote(f'{self.activity} {self.city}')}/@{lat},{lng},{zoom}z"
-                await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+
+                # CRITICAL: Use networkidle to wait for AJAX responses
+                await page.goto(url, wait_until="networkidle", timeout=30000)
                 await asyncio.sleep(PAGE_DELAY)
 
-                for _ in range(SCROLL_COUNT):
+                # Scroll to load more results
+                for scroll_i in range(SCROLL_COUNT):
                     await page.evaluate('const f=document.querySelector(\'div[role="feed"]\');if(f)f.scrollTo(0,f.scrollHeight);')
                     await asyncio.sleep(SCROLL_DELAY)
+
+                # Extra wait after scrolling for AJAX to complete
+                await asyncio.sleep(1.0)
 
                 async with self._zone_lock:
                     self.zones_done += 1
                     # Phase 1 = 0-40% of total progress
                     phase1_percent = int((self.zones_done / self.total_zones) * 40)
+                    ids_found = len(self.data.place_ids)
+                    if DEBUG_MODE:
+                        logger.info(f"[ZONE {zone_id + 1}] Complete. Total IDs: {ids_found}")
                     emit("zone_complete", {
                         "zone": zone_id + 1,
                         "total_zones": self.total_zones,
-                        "total_businesses": len(self.data.place_ids),
+                        "total_businesses": ids_found,
                         "percent": phase1_percent,
                         "global_percent": phase1_percent
                     })
-            except:
+            except Exception as e:
+                logger.warning(f"[ZONE {zone_id + 1}] Error: {str(e)[:80]}")
                 async with self._zone_lock:
                     self.zones_done += 1
                     # Émettre même en cas d'erreur pour maintenir la progression
@@ -619,14 +690,42 @@ class GMBScraperProduction:
             "grid_size": self.grid_size,
             "total_zones": self.total_zones,
             "cell_size_km": round(self.cell_size * 111, 2),
-            "version": f"v4.2 Robust - 40 workers, {self.total_zones} zones"
+            "version": f"v4.5 Fixed - networkidle, anti-detection, {self.total_zones} zones"
         })
 
         async with async_playwright() as p:
+            logger.info(f"[BROWSER] Launching Chromium (headless={HEADLESS})")
+
+            # Anti-detection browser arguments
+            browser_args = [
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--disable-infobars',
+                '--window-size=1920,1080',
+                '--start-maximized',
+                '--ignore-certificate-errors',
+                '--allow-running-insecure-content',
+                '--disable-extensions',
+                '--proxy-server="direct://"',
+                '--proxy-bypass-list=*',
+                '--disable-background-networking',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--metrics-recording-only',
+                '--mute-audio',
+                '--no-first-run',
+            ]
+
             browser = await p.chromium.launch(
-                headless=True,
-                args=['--disable-blink-features=AutomationControlled', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+                headless=HEADLESS,
+                args=browser_args
             )
+
+            logger.info("[BROWSER] Chromium launched successfully")
 
             # Generate grid
             zones = []
@@ -654,6 +753,9 @@ class GMBScraperProduction:
                 self.phase1_worker(browser, i, zone_chunks[i])
                 for i in range(min(phase1_workers, len(zone_chunks)))
             ])
+
+            # Phase 1 summary
+            logger.info(f"[PHASE 1 COMPLETE] Total IDs collected: {len(self.data.place_ids)}")
 
             # PHASE 2 - 40 to 80%
             all_pids = self.data.get_all_ids()
