@@ -20,7 +20,8 @@ FROM mcr.microsoft.com/playwright:v1.40.0-jammy
 
 WORKDIR /app
 
-# Install Node.js 20 AND python3-pip (pip3 not included in base image)
+# Install Node.js 20 AND python3-pip
+# Note: Ubuntu 22.04 has pip 22.x which doesn't need --break-system-packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl python3-pip && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -40,8 +41,8 @@ COPY scraper ./scraper
 # Copy public folder for web frontend
 COPY public ./public
 
-# Install Python dependencies (browsers already in base image)
-RUN pip3 install playwright aiohttp --break-system-packages
+# Install Python dependencies (no --break-system-packages on pip 22.x)
+RUN pip3 install playwright aiohttp
 
 # Environment variables
 ENV NODE_ENV=production
