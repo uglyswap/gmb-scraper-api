@@ -12,7 +12,7 @@ const scrapeRouter = new Hono();
 const WebhookScrapeSchema = z.object({
   activity: z.string().min(2, 'Activité requise (min 2 caractères)'),
   city: z.string().min(2, 'Ville requise (min 2 caractères)'),
-  grid_size: z.coerce.number().int().min(1).max(32).default(4),
+  grid_size: z.coerce.number().int().min(1).max(55).default(4),
   webhook_url: z.string().url('URL webhook invalide'),
 });
 
@@ -30,7 +30,6 @@ const jobStore = new Map<string, {
 // ============================================================================
 
 scrapeRouter.get('/stream', async (c) => {
-  // Validation des paramètres
   const activity = c.req.query('activity');
   const city = c.req.query('city');
   const gridSize = c.req.query('grid_size') || '4';
@@ -53,18 +52,15 @@ scrapeRouter.get('/stream', async (c) => {
   const query = validation.data;
   const jobId = uuidv4();
 
-  // Initialiser le job
   jobStore.set(jobId, {
     status: 'running',
     startedAt: new Date()
   });
 
-  // Headers SSE
   return streamSSE(c, async (stream) => {
     const scraper = new ScraperService();
     const businesses: Business[] = [];
 
-    // Envoyer l'ID du job
     await stream.writeSSE({
       event: 'job',
       data: JSON.stringify({ job_id: jobId })
@@ -76,18 +72,15 @@ scrapeRouter.get('/stream', async (c) => {
         city: query.city,
         gridSize: query.grid_size
       })) {
-        // Collecter les businesses
         if (event.type === 'business' && (event as any).data) {
           businesses.push((event as any).data);
         }
 
-        // Envoyer l'événement SSE
         await stream.writeSSE({
           event: event.type,
           data: JSON.stringify(event)
         });
 
-        // Si c'est la fin, mettre à jour le store
         if (event.type === 'complete') {
           const completeEvent = event as any;
           jobStore.set(jobId, {
@@ -129,7 +122,7 @@ scrapeRouter.get('/stream', async (c) => {
 });
 
 // ============================================================================
-// POST /scrape - Lancement synchrone (attend la fin)
+// POST /scrape - Lancement synchrone
 // ============================================================================
 
 scrapeRouter.post('/', async (c) => {
@@ -145,7 +138,7 @@ scrapeRouter.post('/', async (c) => {
       usage: {
         activity: 'Type de business (ex: "restaurant", "coiffeur", "agence immobiliere")',
         city: `Ville (${SUPPORTED_CITIES.slice(0, 5).join(', ')}...)`,
-        grid_size: 'Taille de la grille 1-32 (défaut: 4)'
+        grid_size: 'Taille de la grille 1-55 (défaut: 4)'
       },
       timestamp: new Date().toISOString()
     }, 400);
@@ -154,7 +147,6 @@ scrapeRouter.post('/', async (c) => {
   const query = validation.data;
   const jobId = uuidv4();
 
-  // Initialiser le job
   jobStore.set(jobId, {
     status: 'running',
     startedAt: new Date()
@@ -183,7 +175,6 @@ scrapeRouter.post('/', async (c) => {
       completedAt: new Date()
     });
 
-    // Structure aplatie pour compatibilité n8n (champs directement accessibles)
     return c.json({
       success: true,
       job_id: scrapeResult.job_id,
@@ -212,7 +203,7 @@ scrapeRouter.post('/', async (c) => {
 });
 
 // ============================================================================
-// POST /scrape/webhook - Mode asynchrone avec callback webhook (idéal pour n8n)
+// POST /scrape/webhook - Mode webhook pour n8n
 // ============================================================================
 
 scrapeRouter.post('/webhook', async (c) => {
@@ -228,7 +219,7 @@ scrapeRouter.post('/webhook', async (c) => {
       usage: {
         activity: 'Type de business (ex: "restaurant", "coiffeur")',
         city: `Ville (${SUPPORTED_CITIES.slice(0, 5).join(', ')}...)`,
-        grid_size: 'Taille de la grille 1-32 (défaut: 4)',
+        grid_size: 'Taille de la grille 1-55 (défaut: 4)',
         webhook_url: 'URL du webhook n8n à appeler quand terminé'
       },
       timestamp: new Date().toISOString()
@@ -238,13 +229,11 @@ scrapeRouter.post('/webhook', async (c) => {
   const { activity, city, grid_size, webhook_url } = validation.data;
   const jobId = uuidv4();
 
-  // Initialiser le job
   jobStore.set(jobId, {
     status: 'running',
     startedAt: new Date()
   });
 
-  // Lancer le scraping en arrière-plan (ne pas attendre)
   (async () => {
     const scraper = new ScraperService();
 
@@ -269,7 +258,6 @@ scrapeRouter.post('/webhook', async (c) => {
         completedAt: new Date()
       });
 
-      // Appeler le webhook n8n avec les résultats (structure plate)
       await fetch(webhook_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -296,7 +284,6 @@ scrapeRouter.post('/webhook', async (c) => {
         completedAt: new Date()
       });
 
-      // Notifier l'erreur au webhook
       try {
         await fetch(webhook_url, {
           method: 'POST',
@@ -316,7 +303,6 @@ scrapeRouter.post('/webhook', async (c) => {
     }
   })();
 
-  // Réponse immédiate
   return c.json({
     success: true,
     job_id: jobId,
@@ -357,7 +343,7 @@ scrapeRouter.get('/:jobId', (c) => {
 });
 
 // ============================================================================
-// GET /scrape/cities - Liste des villes supportées
+// GET /scrape/info/cities - Liste des villes
 // ============================================================================
 
 scrapeRouter.get('/info/cities', (c) => {

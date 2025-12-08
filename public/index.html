@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GMB Scraper API - v3.2 PRODUCTION</title>
+  <title>GMB Scraper API - v4.0 FINAL</title>
   <style>
     * {
       margin: 0;
@@ -76,6 +76,12 @@
       border: 1px solid #ffc107;
     }
 
+    .badge-purple {
+      background: rgba(155, 89, 182, 0.2);
+      color: #9b59b6;
+      border: 1px solid #9b59b6;
+    }
+
     .main-grid {
       display: grid;
       grid-template-columns: 350px 1fr;
@@ -115,8 +121,7 @@
       font-size: 0.9rem;
     }
 
-    .form-group input,
-    .form-group select {
+    .form-group input {
       width: 100%;
       padding: 12px 15px;
       border-radius: 10px;
@@ -127,8 +132,7 @@
       transition: all 0.3s;
     }
 
-    .form-group input:focus,
-    .form-group select:focus {
+    .form-group input:focus {
       outline: none;
       border-color: #4facfe;
       background: rgba(255, 255, 255, 0.1);
@@ -136,6 +140,38 @@
 
     .form-group input::placeholder {
       color: #666;
+    }
+
+    /* Fixed select dropdown styling */
+    .form-group select {
+      width: 100%;
+      padding: 12px 15px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: #1a1a2e;
+      color: #fff;
+      font-size: 1rem;
+      transition: all 0.3s;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 16px;
+      padding-right: 40px;
+    }
+
+    .form-group select:focus {
+      outline: none;
+      border-color: #4facfe;
+    }
+
+    .form-group select option {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 10px;
     }
 
     .btn {
@@ -189,19 +225,19 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
       gap: 15px;
     }
 
     .stat-card {
       background: rgba(255, 255, 255, 0.05);
       border-radius: 12px;
-      padding: 20px;
+      padding: 15px;
       text-align: center;
     }
 
     .stat-value {
-      font-size: 2rem;
+      font-size: 1.8rem;
       font-weight: 700;
       background: linear-gradient(90deg, #4facfe, #00f2fe);
       -webkit-background-clip: text;
@@ -211,7 +247,7 @@
 
     .stat-label {
       color: #888;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       margin-top: 5px;
     }
 
@@ -219,14 +255,14 @@
       background: rgba(0, 0, 0, 0.3);
       border-radius: 12px;
       padding: 15px;
-      height: 300px;
+      height: 250px;
       overflow-y: auto;
       font-family: 'Monaco', 'Menlo', monospace;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
     }
 
     .log-entry {
-      padding: 4px 0;
+      padding: 3px 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     }
 
@@ -245,6 +281,10 @@
 
     .log-error {
       color: #ff4757;
+    }
+
+    .log-email {
+      color: #9b59b6;
     }
 
     .table-container {
@@ -297,18 +337,20 @@
 
     .phase-indicator {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       margin-bottom: 20px;
+      flex-wrap: wrap;
     }
 
     .phase {
       flex: 1;
-      padding: 10px;
+      min-width: 80px;
+      padding: 8px;
       border-radius: 8px;
       text-align: center;
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      font-size: 0.85rem;
+      font-size: 0.75rem;
     }
 
     .phase.active {
@@ -382,6 +424,22 @@
       align-items: center;
       gap: 10px;
     }
+
+    .info-box {
+      background: rgba(155, 89, 182, 0.1);
+      border: 1px solid rgba(155, 89, 182, 0.3);
+      border-radius: 8px;
+      padding: 10px 15px;
+      margin-top: 15px;
+      font-size: 0.85rem;
+      color: #bb8fce;
+    }
+
+    .grid-info {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -390,10 +448,10 @@
       <h1>GMB Scraper API</h1>
       <p class="subtitle">Extraction de donnees Google My Business</p>
       <div class="badges">
-        <span class="badge badge-success">v3.2 PRODUCTION</span>
+        <span class="badge badge-success">v4.0 FINAL</span>
         <span class="badge badge-info">40 Workers</span>
-        <span class="badge badge-warning">Max 1024 zones</span>
-        <span class="badge badge-info">SSE Streaming</span>
+        <span class="badge badge-warning">Max 3025 zones</span>
+        <span class="badge badge-purple">Email Enrichment</span>
       </div>
     </header>
 
@@ -415,13 +473,15 @@
         <div class="form-group">
           <label for="gridSize">Precision de la grille</label>
           <select id="gridSize">
-            <option value="3">Rapide (9 zones)</option>
-            <option value="4" selected>Standard (16 zones)</option>
-            <option value="6">Complet (36 zones)</option>
-            <option value="10">Maximum (100 zones)</option>
-            <option value="20">Ultra (400 zones)</option>
-            <option value="32">Extreme (1024 zones)</option>
+            <option value="3">Rapide - 9 zones</option>
+            <option value="4" selected>Standard - 16 zones</option>
+            <option value="6">Complet - 36 zones</option>
+            <option value="10">Etendu - 100 zones</option>
+            <option value="20">Precis - 400 zones</option>
+            <option value="32">Ultra - 1024 zones</option>
+            <option value="55">Maximum - 3025 zones</option>
           </select>
+          <div class="grid-info" id="gridInfo">16 zones = ~2.5km par cellule</div>
         </div>
 
         <div class="form-group">
@@ -432,6 +492,11 @@
         <button class="btn btn-primary" id="startBtn" onclick="startScraping()">
           Lancer le scraping
         </button>
+
+        <div class="info-box">
+          <strong>Enrichissement Email:</strong><br>
+          Crawl automatique des sites web (pages contact, about, mailto:, formulaires)
+        </div>
 
         <div class="api-info">
           <strong>Endpoints API:</strong><br><br>
@@ -444,7 +509,7 @@
 
       <!-- Right Panel - Results -->
       <div class="results-panel">
-        <!-- Progress Card (hidden by default) -->
+        <!-- Progress Card -->
         <div id="progressCard" class="card progress-card hidden">
           <div class="progress-header">
             <h3><div id="progressSpinner" class="spinner"></div> <span id="progressStatus">Scraping en cours...</span></h3>
@@ -490,6 +555,10 @@
               <div class="stat-value" id="statAddresses">0</div>
               <div class="stat-label">Adresses</div>
             </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statDuration">0s</div>
+              <div class="stat-label">Duree</div>
+            </div>
           </div>
         </div>
 
@@ -501,11 +570,11 @@
 
         <!-- Results Table -->
         <div class="card" id="resultsCard">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>Resultats</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <h2>Resultats (<span id="resultCount">0</span>)</h2>
             <div class="export-buttons">
               <button class="btn btn-success" onclick="exportCSV()">Exporter CSV</button>
-              <button class="btn btn-info" onclick="exportJSON()" style="background: rgba(79, 172, 254, 0.2); color: #4facfe; border: 1px solid #4facfe;">Exporter JSON</button>
+              <button class="btn" onclick="exportJSON()" style="background: rgba(79, 172, 254, 0.2); color: #4facfe; border: 1px solid #4facfe;">Exporter JSON</button>
             </div>
           </div>
           <div class="table-container" style="margin-top: 15px;">
@@ -532,7 +601,16 @@
   <script>
     let eventSource = null;
     let businesses = [];
-    let abortController = null;
+    let startTime = null;
+    let durationInterval = null;
+
+    // Update grid info on change
+    document.getElementById('gridSize').addEventListener('change', function() {
+      const size = parseInt(this.value);
+      const zones = size * size;
+      const cellSize = (10 / size).toFixed(1);
+      document.getElementById('gridInfo').textContent = `${zones} zones = ~${cellSize}km par cellule`;
+    });
 
     function log(message, type = 'info') {
       const container = document.getElementById('logContainer');
@@ -545,6 +623,7 @@
       if (type === 'zone') className = 'log-zone';
       else if (type === 'business') className = 'log-business';
       else if (type === 'error') className = 'log-error';
+      else if (type === 'email') className = 'log-email';
       
       entry.innerHTML = `<span class="log-time">[${time}]</span><span class="${className}">${message}</span>`;
       container.appendChild(entry);
@@ -557,6 +636,14 @@
       if (stats.with_email !== undefined) document.getElementById('statEmails').textContent = stats.with_email;
       if (stats.with_website !== undefined) document.getElementById('statWebsites').textContent = stats.with_website;
       if (stats.with_address !== undefined) document.getElementById('statAddresses').textContent = stats.with_address;
+      if (stats.duration_seconds !== undefined) document.getElementById('statDuration').textContent = stats.duration_seconds + 's';
+    }
+
+    function updateDuration() {
+      if (startTime) {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        document.getElementById('statDuration').textContent = elapsed + 's';
+      }
     }
 
     function updateProgress(percent) {
@@ -587,16 +674,20 @@
       `;
       
       tbody.appendChild(row);
+      document.getElementById('resultCount').textContent = businesses.length;
     }
 
     function finishScraping(stats, allBusinesses) {
       document.getElementById('startBtn').disabled = false;
-      
-      // Update header status
       document.getElementById('progressStatus').textContent = 'Termine!';
       document.getElementById('progressSpinner').style.display = 'none';
       
-      setPhase(5); // All done
+      if (durationInterval) {
+        clearInterval(durationInterval);
+        durationInterval = null;
+      }
+      
+      setPhase(5);
       
       if (stats) {
         updateStats(stats);
@@ -608,7 +699,7 @@
         allBusinesses.forEach(b => addBusinessToTable(b));
       }
       
-      log(`Termine! ${businesses.length} entreprises`, 'business');
+      log(`Termine! ${businesses.length} entreprises extraites`, 'business');
     }
 
     async function startScraping() {
@@ -629,25 +720,29 @@
 
       // Reset UI
       businesses = [];
+      startTime = Date.now();
       document.getElementById('resultsBody').innerHTML = '';
       document.getElementById('logContainer').innerHTML = '';
       document.getElementById('progressCard').classList.remove('hidden');
       document.getElementById('startBtn').disabled = true;
       document.getElementById('progressStatus').textContent = 'Scraping en cours...';
       document.getElementById('progressSpinner').style.display = 'inline-block';
+      document.getElementById('resultCount').textContent = '0';
       updateProgress(0);
-      updateStats({ total: 0, with_phone: 0, with_email: 0, with_website: 0, with_address: 0 });
+      updateStats({ total: 0, with_phone: 0, with_email: 0, with_website: 0, with_address: 0, duration_seconds: 0 });
       setPhase(1);
 
-      log(`Demarrage: "${activity}" a ${city}`);
+      // Start duration timer
+      durationInterval = setInterval(updateDuration, 1000);
 
-      // Build URL
+      const zones = parseInt(gridSize) * parseInt(gridSize);
+      log(`Demarrage: "${activity}" a ${city} (${zones} zones)`);
+
       let url = `/api/scrape/stream?activity=${encodeURIComponent(activity)}&city=${encodeURIComponent(city)}&grid_size=${gridSize}`;
       if (apiKey) {
         url += `&api_key=${encodeURIComponent(apiKey)}`;
       }
 
-      // SSE connection
       eventSource = new EventSource(url);
 
       eventSource.onopen = () => {
@@ -658,17 +753,21 @@
         log('Connexion fermee', 'error');
         eventSource.close();
         document.getElementById('startBtn').disabled = false;
+        if (durationInterval) {
+          clearInterval(durationInterval);
+          durationInterval = null;
+        }
       };
 
       eventSource.addEventListener('geocoding', (e) => {
         const data = JSON.parse(e.data);
-        log(`Geocoding: ${data.display_name} (${data.lat}, ${data.lng})`, 'info');
+        log(`Geocoding: ${data.display_name} (${data.lat.toFixed(4)}, ${data.lng.toFixed(4)})`, 'info');
         setPhase(1);
       });
 
       eventSource.addEventListener('start', (e) => {
         const data = JSON.parse(e.data);
-        log(`Scan: ${data.total_zones} zones, version ${data.version || 'N/A'}`, 'info');
+        log(`Scan: ${data.total_zones} zones - ${data.version || 'N/A'}`, 'info');
         setPhase(2);
       });
 
@@ -684,12 +783,14 @@
 
       eventSource.addEventListener('zone_links', (e) => {
         const data = JSON.parse(e.data);
-        log(`Zone ${data.zone}: ${data.unique_new} nouvelles fiches a extraire`, 'zone');
+        if (data.unique_new > 0) {
+          log(`+${data.unique_new} nouvelles fiches (total: ${data.total_ids})`, 'zone');
+        }
       });
 
       eventSource.addEventListener('extraction_start', (e) => {
         const data = JSON.parse(e.data);
-        log(`Extraction details: ${data.total} fiches a traiter`, 'info');
+        log(`Extraction details: ${data.total} fiches`, 'info');
         setPhase(3);
         updateProgress(0);
       });
@@ -699,7 +800,6 @@
         businesses.push(data);
         addBusinessToTable(data);
         
-        // Update stats in real-time
         updateStats({
           total: businesses.length,
           with_phone: businesses.filter(b => b.phone).length,
@@ -713,18 +813,22 @@
 
       eventSource.addEventListener('email_extraction_start', (e) => {
         const data = JSON.parse(e.data);
-        log(`Extraction emails: ${data.total_sites} sites web a scanner`, 'info');
+        log(`Enrichissement emails: ${data.total_sites} sites a crawler`, 'email');
         setPhase(4);
       });
 
       eventSource.addEventListener('email_found', (e) => {
         const data = JSON.parse(e.data);
-        log(`Email trouve: ${data.email}`, 'business');
+        log(`Email trouve: ${data.email}`, 'email');
         
-        // Update stats
-        updateStats({
-          with_email: businesses.filter(b => b.email).length + 1
-        });
+        // Update the business in table if visible
+        const emailCount = businesses.filter(b => b.email).length + 1;
+        document.getElementById('statEmails').textContent = emailCount;
+      });
+
+      eventSource.addEventListener('email_crawl_page', (e) => {
+        const data = JSON.parse(e.data);
+        log(`Crawl: ${data.page} (${data.processed}/${data.total})`, 'email');
       });
 
       eventSource.addEventListener('status', (e) => {
@@ -747,6 +851,10 @@
         }
         eventSource.close();
         document.getElementById('startBtn').disabled = false;
+        if (durationInterval) {
+          clearInterval(durationInterval);
+          durationInterval = null;
+        }
       });
     }
 
@@ -755,7 +863,13 @@
         eventSource.close();
         eventSource = null;
       }
+      if (durationInterval) {
+        clearInterval(durationInterval);
+        durationInterval = null;
+      }
       document.getElementById('startBtn').disabled = false;
+      document.getElementById('progressStatus').textContent = 'Arrete';
+      document.getElementById('progressSpinner').style.display = 'none';
       log('Scraping arrete par l\'utilisateur', 'error');
     }
 
@@ -765,7 +879,7 @@
         return;
       }
 
-      const headers = ['Nom', 'Telephone', 'Telephone Clean', 'Email', 'Adresse', 'Site Web', 'Note', 'Avis', 'Categorie', 'Google Maps URL'];
+      const headers = ['Nom', 'Telephone', 'Telephone_Clean', 'Email', 'Adresse', 'Site_Web', 'Note', 'Avis', 'Categorie', 'Google_Maps_URL', 'Place_ID'];
       const rows = businesses.map(b => [
         b.name || '',
         b.phone || '',
@@ -776,10 +890,12 @@
         b.rating || '',
         b.review_count || '',
         b.category || '',
-        b.google_maps_url || ''
+        b.google_maps_url || '',
+        b.place_id || ''
       ]);
 
-      let csv = headers.join(';') + '\n';
+      let csv = '\uFEFF'; // BOM for Excel UTF-8
+      csv += headers.join(';') + '\n';
       rows.forEach(row => {
         csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';') + '\n';
       });
@@ -787,7 +903,7 @@
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `gmb_export_${new Date().toISOString().slice(0,10)}.csv`;
+      link.download = `gmb_${document.getElementById('activity').value}_${document.getElementById('city').value}_${new Date().toISOString().slice(0,10)}.csv`;
       link.click();
     }
 
@@ -797,10 +913,21 @@
         return;
       }
 
-      const blob = new Blob([JSON.stringify(businesses, null, 2)], { type: 'application/json' });
+      const exportData = {
+        metadata: {
+          activity: document.getElementById('activity').value,
+          city: document.getElementById('city').value,
+          grid_size: document.getElementById('gridSize').value,
+          total: businesses.length,
+          exported_at: new Date().toISOString()
+        },
+        businesses: businesses
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `gmb_export_${new Date().toISOString().slice(0,10)}.json`;
+      link.download = `gmb_${document.getElementById('activity').value}_${document.getElementById('city').value}_${new Date().toISOString().slice(0,10)}.json`;
       link.click();
     }
   </script>
