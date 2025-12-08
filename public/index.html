@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GMB Scraper API - v4.0 FINAL</title>
+  <title>GMB Scraper API - v4.1 FIXED</title>
   <style>
     * {
       margin: 0;
@@ -291,6 +291,7 @@
       overflow-x: auto;
       max-height: 500px;
       overflow-y: auto;
+      position: relative;
     }
 
     table {
@@ -304,13 +305,14 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* FIXED: Opaque background for table header */
+    /* FIXED: Background opaque pour les en-têtes de tableau */
     th {
-      background: #1e2a3a;
+      background-color: #1a1a2e;
       font-weight: 600;
       position: sticky;
       top: 0;
       z-index: 10;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     tr:hover {
@@ -450,7 +452,7 @@
       <h1>GMB Scraper API</h1>
       <p class="subtitle">Extraction de donnees Google My Business</p>
       <div class="badges">
-        <span class="badge badge-success">v4.0 FINAL</span>
+        <span class="badge badge-success">v4.1 FIXED</span>
         <span class="badge badge-info">40 Workers</span>
         <span class="badge badge-warning">Max 3025 zones</span>
         <span class="badge badge-purple">Email Enrichment</span>
@@ -487,7 +489,7 @@
         </div>
 
         <div class="form-group">
-          <label for="apiKey">Cle API (optionnel)</label>
+          <label for="apiKey">Cle API</label>
           <input type="text" id="apiKey" placeholder="Votre cle API">
         </div>
 
@@ -605,6 +607,7 @@
     let businesses = [];
     let startTime = null;
     let durationInterval = null;
+    let lastKnownPercent = 0;
 
     // Update grid info on change
     document.getElementById('gridSize').addEventListener('change', function() {
@@ -649,6 +652,11 @@
     }
 
     function updateProgress(percent) {
+      // Ne jamais reculer la progression
+      if (percent < lastKnownPercent) {
+        return;
+      }
+      lastKnownPercent = percent;
       document.getElementById('progressFill').style.width = percent + '%';
       document.getElementById('progressText').textContent = percent + '%';
     }
@@ -721,9 +729,15 @@
         return;
       }
 
+      if (!apiKey) {
+        alert('Veuillez entrer votre cle API');
+        return;
+      }
+
       // Reset UI
       businesses = [];
       startTime = Date.now();
+      lastKnownPercent = 0;
       document.getElementById('resultsBody').innerHTML = '';
       document.getElementById('logContainer').innerHTML = '';
       document.getElementById('progressCard').classList.remove('hidden');
@@ -741,10 +755,7 @@
       const zones = parseInt(gridSize) * parseInt(gridSize);
       log(`Demarrage: "${activity}" a ${city} (${zones} zones)`);
 
-      let url = `/api/scrape/stream?activity=${encodeURIComponent(activity)}&city=${encodeURIComponent(city)}&grid_size=${gridSize}`;
-      if (apiKey) {
-        url += `&api_key=${encodeURIComponent(apiKey)}`;
-      }
+      let url = `/api/scrape/stream?activity=${encodeURIComponent(activity)}&city=${encodeURIComponent(city)}&grid_size=${gridSize}&api_key=${encodeURIComponent(apiKey)}`;
 
       eventSource = new EventSource(url);
 
@@ -766,12 +777,14 @@
         const data = JSON.parse(e.data);
         log(`Geocoding: ${data.display_name} (${data.lat.toFixed(4)}, ${data.lng.toFixed(4)})`, 'info');
         setPhase(1);
+        updateProgress(1);
       });
 
       eventSource.addEventListener('start', (e) => {
         const data = JSON.parse(e.data);
         log(`Scan: ${data.total_zones} zones - ${data.version || 'N/A'}`, 'info');
         setPhase(2);
+        updateProgress(2);
       });
 
       eventSource.addEventListener('zone_start', (e) => {
@@ -781,9 +794,10 @@
 
       eventSource.addEventListener('zone_complete', (e) => {
         const data = JSON.parse(e.data);
-        // Use global_percent if available, otherwise use percent
         const percent = data.global_percent !== undefined ? data.global_percent : data.percent;
-        updateProgress(percent);
+        if (percent !== undefined) {
+          updateProgress(percent);
+        }
       });
 
       eventSource.addEventListener('zone_links', (e) => {
@@ -799,6 +813,8 @@
         setPhase(3);
         if (data.global_percent !== undefined) {
           updateProgress(data.global_percent);
+        } else {
+          updateProgress(40);
         }
       });
 
@@ -806,6 +822,9 @@
         const data = JSON.parse(e.data);
         if (data.global_percent !== undefined) {
           updateProgress(data.global_percent);
+        }
+        if (data.extracted !== undefined && data.total !== undefined) {
+          log(`Extraction: ${data.extracted}/${data.total} fiches`, 'info');
         }
       });
 
@@ -829,7 +848,11 @@
         const data = JSON.parse(e.data);
         log(`Enrichissement emails: ${data.total_sites} sites a crawler`, 'email');
         setPhase(4);
-        updateProgress(80);
+        if (data.global_percent !== undefined) {
+          updateProgress(data.global_percent);
+        } else {
+          updateProgress(80);
+        }
       });
 
       eventSource.addEventListener('email_found', (e) => {
@@ -915,13 +938,21 @@
         b.place_id || ''
       ]);
 
-      let csv = '\uFEFF'; // BOM for Excel UTF-8
-      csv += headers.join(';') + '\n';
+      // Construire le contenu CSV
+      let csvContent = '';
+      csvContent += headers.join(';') + '\n';
       rows.forEach(row => {
-        csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';') + '\n';
+        csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';') + '\n';
       });
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      // FIXED: Encodage UTF-8 correct avec BOM pour Excel
+      const BOM = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const encoder = new TextEncoder();
+      const csvData = encoder.encode(csvContent);
+      
+      // Combiner BOM + données
+      const blob = new Blob([BOM, csvData], { type: 'text/csv;charset=utf-8' });
+      
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = `gmb_${document.getElementById('activity').value}_${document.getElementById('city').value}_${new Date().toISOString().slice(0,10)}.csv`;
