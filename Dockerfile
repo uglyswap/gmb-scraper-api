@@ -1,24 +1,54 @@
-# Single stage - Playwright image already has Node.js 18 and browsers
-FROM mcr.microsoft.com/playwright:v1.49.0-jammy
+# Multi-stage build for GMB Scraper API
+# Node.js API + Python Playwright Scraper
+
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy package files
 COPY package*.json ./
+
+# Install Node.js dependencies (including dev for tsx)
 RUN npm install
 
-# Copy all source files
+# Copy source code
 COPY tsconfig.json ./
 COPY src ./src
+
+# Production image with Python + Playwright (v1.40.0 has pip3 pre-installed)
+FROM mcr.microsoft.com/playwright:v1.40.0-jammy
+
+WORKDIR /app
+
+# Install Node.js 20 without apt-get update (use cached repos)
+RUN apt-get install -y --no-install-recommends curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy Node.js dependencies and source files
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./
+
+# Copy Python scraper
 COPY scraper ./scraper
+
+# Copy public folder for web frontend
 COPY public ./public
 
 # Install Python dependencies (browsers already in base image)
 RUN pip3 install playwright aiohttp --break-system-packages
 
-# Expose port
+# Environment variables
+ENV NODE_ENV=production
 ENV PORT=3000
+ENV PYTHON_PATH=python3
+
+# Expose port
 EXPOSE 3000
 
-# Start the application
+# Start the API with tsx (TypeScript runtime)
 CMD ["npx", "tsx", "src/index.ts"]
