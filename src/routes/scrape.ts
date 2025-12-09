@@ -60,6 +60,23 @@ scrapeRouter.get('/stream', async (c) => {
   return streamSSE(c, async (stream) => {
     const scraper = new ScraperService();
     const businesses: Business[] = [];
+    let isComplete = false;
+
+    // Heartbeat pour maintenir la connexion SSE active pendant l'initialisation de Playwright
+    // Critique pour les grandes grilles (3025 zones) où l'init peut prendre 10+ secondes
+    const heartbeatInterval = setInterval(async () => {
+      if (!isComplete) {
+        try {
+          await stream.writeSSE({
+            event: 'ping',
+            data: JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() })
+          });
+        } catch {
+          // Connexion fermée, arrêter le heartbeat
+          clearInterval(heartbeatInterval);
+        }
+      }
+    }, 3000); // Ping toutes les 3 secondes
 
     await stream.writeSSE({
       event: 'job',
@@ -82,6 +99,8 @@ scrapeRouter.get('/stream', async (c) => {
         });
 
         if (event.type === 'complete') {
+          isComplete = true;
+          clearInterval(heartbeatInterval);
           const completeEvent = event as any;
           jobStore.set(jobId, {
             status: 'completed',
@@ -97,6 +116,8 @@ scrapeRouter.get('/stream', async (c) => {
         }
 
         if (event.type === 'error') {
+          isComplete = true;
+          clearInterval(heartbeatInterval);
           jobStore.set(jobId, {
             status: 'error',
             error: (event as any).message,
@@ -106,6 +127,8 @@ scrapeRouter.get('/stream', async (c) => {
         }
       }
     } catch (e) {
+      isComplete = true;
+      clearInterval(heartbeatInterval);
       const errorMsg = e instanceof Error ? e.message : String(e);
       await stream.writeSSE({
         event: 'error',
