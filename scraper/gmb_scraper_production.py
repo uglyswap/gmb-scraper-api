@@ -229,7 +229,7 @@ class GMBScraperProduction:
         return [lst[i:i + size] for i in range(0, len(lst), size)]
 
     async def _create_browser(self, playwright):
-        return await playwright.chromium.launch(headless=HEADLESS, args=['--disable-blink-features=AutomationControlled', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process', '--disable-extensions'])
+        return await playwright.chromium.launch(headless=HEADLESS, args=['--disable-blink-features=AutomationControlled', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-extensions'])
 
     def extract_place_ids(self, body: str) -> List[str]:
         ids = set()
