@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { stream } from 'hono/streaming';
+import { streamSSE } from 'hono/streaming';
 import { v4 as uuidv4 } from 'uuid';
 import { ScraperService } from '../services/scraper.js';
 import { ScrapeQuerySchema, SUPPORTED_CITIES } from '../types/index.js';
@@ -25,13 +25,8 @@ const jobStore = new Map<string, {
   completedAt?: Date;
 }>();
 
-// Helper pour formater un événement SSE
-function formatSSE(event: string, data: string): string {
-  return `event: ${event}\ndata: ${data}\n\n`;
-}
-
 // ============================================================================
-// GET /scrape/stream - Streaming SSE (FIXED: Manual SSE with proper headers)
+// GET /scrape/stream - Streaming SSE
 // ============================================================================
 
 scrapeRouter.get('/stream', async (c) => {
@@ -62,40 +57,14 @@ scrapeRouter.get('/stream', async (c) => {
     startedAt: new Date()
   });
 
-  // Headers SSE critiques pour les connexions longues
-  c.header('Content-Type', 'text/event-stream');
-  c.header('Cache-Control', 'no-cache, no-transform');
-  c.header('Connection', 'keep-alive');
-  c.header('X-Accel-Buffering', 'no'); // Désactive le buffering nginx/proxy
-  c.header('Access-Control-Allow-Origin', '*');
-
-  return stream(c, async (streamWriter) => {
+  return streamSSE(c, async (stream) => {
     const scraper = new ScraperService();
     const businesses: Business[] = [];
-    let isComplete = false;
 
-    // Helper pour écrire un événement SSE
-    const writeSSE = async (event: string, data: any) => {
-      try {
-        await streamWriter.write(formatSSE(event, JSON.stringify(data)));
-      } catch (e) {
-        // Stream closed
-        isComplete = true;
-      }
-    };
-
-    // Heartbeat IMMÉDIAT et fréquent pour maintenir la connexion
-    // Envoie un ping toutes les 1 seconde pour éviter tout timeout
-    const heartbeatInterval = setInterval(async () => {
-      if (!isComplete) {
-        await writeSSE('ping', { type: 'ping', timestamp: new Date().toISOString() });
-      } else {
-        clearInterval(heartbeatInterval);
-      }
-    }, 1000); // Ping toutes les secondes
-
-    // Envoyer immédiatement le job ID
-    await writeSSE('job', { job_id: jobId });
+    await stream.writeSSE({
+      event: 'job',
+      data: JSON.stringify({ job_id: jobId })
+    });
 
     try {
       for await (const event of scraper.stream({
@@ -103,17 +72,16 @@ scrapeRouter.get('/stream', async (c) => {
         city: query.city,
         gridSize: query.grid_size
       })) {
-        if (isComplete) break;
-
         if (event.type === 'business' && (event as any).data) {
           businesses.push((event as any).data);
         }
 
-        await writeSSE(event.type, event);
+        await stream.writeSSE({
+          event: event.type,
+          data: JSON.stringify(event)
+        });
 
         if (event.type === 'complete') {
-          isComplete = true;
-          clearInterval(heartbeatInterval);
           const completeEvent = event as any;
           jobStore.set(jobId, {
             status: 'completed',
@@ -129,8 +97,6 @@ scrapeRouter.get('/stream', async (c) => {
         }
 
         if (event.type === 'error') {
-          isComplete = true;
-          clearInterval(heartbeatInterval);
           jobStore.set(jobId, {
             status: 'error',
             error: (event as any).message,
@@ -140,10 +106,11 @@ scrapeRouter.get('/stream', async (c) => {
         }
       }
     } catch (e) {
-      isComplete = true;
-      clearInterval(heartbeatInterval);
       const errorMsg = e instanceof Error ? e.message : String(e);
-      await writeSSE('error', { type: 'error', message: errorMsg });
+      await stream.writeSSE({
+        event: 'error',
+        data: JSON.stringify({ type: 'error', message: errorMsg })
+      });
       jobStore.set(jobId, {
         status: 'error',
         error: errorMsg,
@@ -151,9 +118,6 @@ scrapeRouter.get('/stream', async (c) => {
         completedAt: new Date()
       });
     }
-
-    // Cleanup
-    clearInterval(heartbeatInterval);
   });
 });
 
