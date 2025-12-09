@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""GMB Scraper PRODUCTION v6.0 - Redis DataStore + Batch Processing
-FIXES: Crash after ~1 hour with maximum grid (3025 zones)"""
+"""GMB Scraper PRODUCTION v6.1 - Fixed Batch Processing
+FIXES: v6.0 bug where memory mode lost data between batches"""
 
 import asyncio, re, json, sys, os, gc, logging
 from datetime import datetime
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 HEADLESS = os.environ.get("HEADLESS", "true").lower() == "true"
 DEBUG_MODE = os.environ.get("DEBUG", "false").lower() == "true"
 
-# v6.0 CONFIG
+# v6.1 CONFIG
 BATCH_SIZE = 200
 BROWSER_RESTART_INTERVAL = 3
 GC_INTERVAL = 1
@@ -115,6 +115,7 @@ class RedisDataStore:
             logger.warning("[REDIS] redis-py not installed. Using in-memory.")
         self._memory_place_ids: Set[str] = set()
         self._memory_businesses: Dict[str, Dict] = {}
+        self._memory_processed: Set[str] = set()  # v6.1 FIX: Track processed IDs in memory mode
 
     async def add_ids(self, ids: List[str]) -> int:
         if not ids: return 0
@@ -161,7 +162,9 @@ class RedisDataStore:
                 ids = list(self.redis_client.sdiff(self._ids_key, self._processed_key))
                 return ids[:limit] if limit else ids
             except: pass
-        ids = list(self._memory_place_ids)
+        # v6.1 FIX: Subtract processed IDs in memory mode
+        ids = list(self._memory_place_ids - self._memory_processed)
+        logger.info(f"[DATASTORE] Unprocessed: {len(ids)} (total: {len(self._memory_place_ids)}, processed: {len(self._memory_processed)})")
         return ids[:limit] if limit else ids
 
     async def mark_ids_processed(self, ids: List[str]):
@@ -170,6 +173,9 @@ class RedisDataStore:
             if self.use_redis:
                 try: self.redis_client.sadd(self._processed_key, *ids)
                 except: pass
+            # v6.1 FIX: Always track processed IDs in memory
+            self._memory_processed.update(ids)
+            logger.info(f"[DATASTORE] Marked {len(ids)} IDs as processed (total processed: {len(self._memory_processed)})")
 
     def get_business(self, pid: str) -> Optional[Dict]:
         if self.use_redis:
@@ -418,7 +424,7 @@ class GMBScraperProduction:
         return [(p, b["website"]) for p, b in self.data.get_businesses_dict().items() if b.get("website") and not b.get("email")]
 
     async def run(self):
-        emit("start", {"activity": self.activity, "city": self.city, "grid_size": self.grid_size, "total_zones": self.total_zones, "total_batches": self.total_batches, "redis_enabled": self.data.use_redis, "version": "v6.0 - Redis + Batch Processing"})
+        emit("start", {"activity": self.activity, "city": self.city, "grid_size": self.grid_size, "total_zones": self.total_zones, "total_batches": self.total_batches, "redis_enabled": self.data.use_redis, "version": "v6.1 - Fixed Batch Processing"})
         all_zones = self._generate_zones()
         all_websites = []
         async with async_playwright() as p:
