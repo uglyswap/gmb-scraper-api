@@ -44,6 +44,11 @@ export class ScraperService {
     // PRODUCTION v3.0 - 55 workers, ~450 businesses/min, 99.8% success rate
     const scraperPath = path.join(__dirname, '..', '..', 'scraper', 'gmb_scraper_production.py');
 
+    console.log(`[SCRAPER] Starting Python scraper...`);
+    console.log(`[SCRAPER] Python path: ${config.pythonPath}`);
+    console.log(`[SCRAPER] Script path: ${scraperPath}`);
+    console.log(`[SCRAPER] Args: ${activity}, ${city}, ${gridSize}`);
+
     this.process = spawn(config.pythonPath, [
       '-u', // Unbuffered output
       scraperPath,
@@ -55,6 +60,8 @@ export class ScraperService {
       env: { ...process.env, PYTHONIOENCODING: 'utf-8', LANG: 'fr_FR.UTF-8' }
     });
 
+    console.log(`[SCRAPER] Process spawned with PID: ${this.process.pid}`);
+
     this.isRunning = true;
     this.businesses = [];
     this.stats = null;
@@ -64,10 +71,19 @@ export class ScraperService {
       crlfDelay: Infinity
     });
 
-    // Gérer les erreurs stderr
-    let stderrBuffer = '';
+    // Gérer les erreurs stderr - MAINTENANT AVEC LOGS
     this.process.stderr?.on('data', (data) => {
-      stderrBuffer += data.toString();
+      const stderr = data.toString();
+      console.error(`[SCRAPER STDERR] ${stderr}`);
+    });
+
+    // Log quand le process se ferme
+    this.process.on('close', (code, signal) => {
+      console.log(`[SCRAPER] Process closed with code: ${code}, signal: ${signal}`);
+    });
+
+    this.process.on('error', (err) => {
+      console.error(`[SCRAPER] Process error: ${err.message}`);
     });
 
     // Créer une queue d'événements
@@ -78,6 +94,7 @@ export class ScraperService {
     rl.on('line', (line) => {
       try {
         const event = JSON.parse(line) as SSEEvent;
+        console.log(`[SCRAPER] Event: ${event.type}`);
 
         // Collecter les businesses et stats
         if (event.type === 'business' && (event as any).data) {
@@ -94,7 +111,10 @@ export class ScraperService {
           eventQueue.push(event);
         }
       } catch {
-        // Ignorer les lignes non-JSON
+        // Log lignes non-JSON pour debug
+        if (line.trim()) {
+          console.log(`[SCRAPER RAW] ${line}`);
+        }
       }
     });
 
