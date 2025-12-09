@@ -44,7 +44,7 @@ COPY public ./public
 # Install Python dependencies
 # CRITICAL: playwright version MUST match the base image version (1.40.0)
 # Otherwise browsers won't be found and scraper will crash
-RUN pip3 install playwright==1.40.0 aiohttp
+RUN pip3 install playwright==1.40.0 aiohttp redis psutil
 
 # Environment variables
 ENV NODE_ENV=production

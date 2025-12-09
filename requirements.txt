@@ -1,0 +1,9 @@
+# GMB Scraper v6.0 Python Dependencies
+
+# Core dependencies (must match Playwright Docker image version)
+playwright==1.40.0
+aiohttp>=3.8.0
+
+# v6.0 additions for memory management
+redis>=4.5.0      # Redis client for external DataStore
+psutil>=5.9.0     # Memory monitoring

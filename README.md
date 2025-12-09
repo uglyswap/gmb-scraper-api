@@ -1,4 +1,12 @@
-# GMB Scraper API v3.0 PRODUCTION
+# GMB Scraper API v6.0 PRODUCTION
+
+## What's New in v6.0
+
+- **Redis DataStore**: External memory management for unlimited grid sizes
+- **Batch Processing**: Large grids (3025 zones) split into batches of 200
+- **Memory Management**: Automatic browser restart + garbage collection
+- **Stability Fix**: No more crashes after 1 hour with maximum grid (55x55)
+
 
 API de scraping Google My Business avec streaming SSE pour des performances optimales.
 
@@ -31,8 +39,18 @@ npm install
 ### Dependances Python
 
 ```bash
-pip install playwright aiohttp
+pip install playwright aiohttp redis psutil
 playwright install chromium
+```
+
+### Redis (optionnel mais recommande pour grilles >500 zones)
+
+```bash
+# Docker
+docker run -d -p 6379:6379 redis:alpine
+
+# Le scraper fonctionne sans Redis (fallback memoire) mais Redis est
+# fortement recommande pour les grandes grilles (3025 zones = 55x55)
 ```
 
 ## Configuration
@@ -43,6 +61,7 @@ Copier `.env.example` vers `.env` et configurer:
 PORT=3000
 API_KEYS=votre_cle_api_1,votre_cle_api_2
 PYTHON_PATH=python
+REDIS_URL=redis://localhost:6379/0  # Optionnel
 ```
 
 ## Demarrage
